@@ -1,0 +1,102 @@
+---
+# ============================================================================
+# Wellea M HT — site overlay for Zoeterwoudseweg (zwwg)
+# ----------------------------------------------------------------------------
+# Layered on top of the public R290-airwell-wellea-m-ht.yaml model overlay
+# (which itself layers on R290-generic.yaml + the Mosibi base).
+#
+# This file is install-specific. It captures:
+#  * which entities to remove because the corresponding hardware feature is
+#    not physically present on this install;
+#  * a UFH safety cap on the Z1 setpoint and on the manual-curve heating
+#    setpoints, because this house heats via underfloor pipes embedded in a
+#    cement screed that cracks well above ~45 °C.
+#
+# Install fingerprint (see wiki/projects/airwell-modbus/install-profile.md
+# for the canonical, fully-cited list):
+#  * single zone (Zone 1 only), no Zone 2 hardware wired;
+#  * underfloor heating (FLH emitter), no radiators, no fan-coil units;
+#  * no IBH, no TBH, no AHS, no SETHEATER (no electric heaters of any kind);
+#  * no buffer tank (no Tbt1/Tbt2 sensors);
+#  * single-PHE refrigerant circuit (no second plate heat exchanger,
+#    no T9i / T9o, no EXV2 / EXV3);
+#  * single-fan ODU (no Fan2);
+#  * no solar thermal;
+#  * dry-contact room thermostat wired (gates reg 0 BIT 1, NOT analog Ta).
+#
+# This file is NEVER pushed to the upstream Mosibi repository — it lives
+# only on the local `site-zwwg` git branch.
+# ============================================================================
+
+parent: R290-airwell-wellea-m-ht.yaml
+
+# -----------------------------------------------------------------------------
+# REMOVE — features absent on this install
+# -----------------------------------------------------------------------------
+remove:
+  number:
+    # Zone 2 setpoint (reg 2 high byte) — single-zone install
+    - id: "${devicename}_set_water_temperature_t1s_zone_2"
+    # Zone 2 climate-curve numbers (regs 280-287, all added by R290-generic).
+    # NB: base/generic appends `_custom_curve_(heating|cooling)` to the id —
+    # earlier versions of this overlay used un-suffixed ids and silently
+    # no-op'd. Fixed during the public/site split.
+    - id: "${devicename}_zone_2_t1setc1_custom_curve_cooling"
+    - id: "${devicename}_zone_2_t1setc2_custom_curve_cooling"
+    - id: "${devicename}_zone_2_t4c1_custom_curve_cooling"
+    - id: "${devicename}_zone_2_t4c2_custom_curve_cooling"
+    - id: "${devicename}_zone_2_t1seth1_custom_curve_heating"
+    - id: "${devicename}_zone_2_t1seth2_custom_curve_heating"
+    - id: "${devicename}_zone_2_t4h1_custom_curve_heating"
+    - id: "${devicename}_zone_2_t4h2_custom_curve_heating"
+    # Solar / Deltatsol — no solar thermal on this install.
+    # NB: base id is `_deltatsol_temp_diff`, not `_solar_temp_difference`.
+    - id: "${devicename}_deltatsol_temp_diff"
+    - id: "${devicename}_gas_price"
+    - id: "${devicename}_electricity_price"
+    # IBH / TBH / SETHEATER — no electric heaters anywhere on this install.
+    # NB: base ids end in `_temp` not `_temperature`.
+    - id: "${devicename}_setheater_max_temp"
+    - id: "${devicename}_setheater_min_temp"
+    - id: "${devicename}_sigheater_max_voltage"
+    - id: "${devicename}_sigheater_min_voltage"
+    # Ta adjustment — analog room-T mode not used (we have a dry-contact
+    # thermostat which gates at reg 0 b1, not via reg 114 Ta)
+    - id: "${devicename}_ta_adjustment_temperature"
+  select:
+    # Zone 2 emission-type selectors — single-zone
+    - id: "${devicename}_zone_2_end_heating_mode_emission_type"
+    - id: "${devicename}_zone_2_end_cooling_mode_emission_type"
+    # Solar function mode — no solar thermal
+    - id: "${devicename}_solar_function_mode"
+  sensor:
+    # Buffer-tank temps Tbt1 / Tbt2 (regs 120/121) — no buffer tank
+    - id: "${devicename}_tbt1"
+    - id: "${devicename}_tbt2"
+    # Second-PHE temps and valves — single-PHE install (return 0x7FFF)
+    - id: "${devicename}_t9i_second_phe_inlet_temperature"
+    - id: "${devicename}_t9o_second_phe_outlet_temperature"
+    - id: "${devicename}_exv2_expansion_valve_openness"
+    - id: "${devicename}_exv3_expansion_valve_openness"
+    # Fan2 — single-fan ODU
+    - id: "${devicename}_fan2_speed"
+
+# -----------------------------------------------------------------------------
+# MODIFY — UFH safety caps for THIS install
+# -----------------------------------------------------------------------------
+# SAFETY: Zone 1 underfloor heating, max water setpoint 40 °C.
+# Cement screed integrity degrades above ~45–50 °C and floor coverings
+# (laminate, vinyl, parquet glue) above ~35–40 °C. 40 °C is the highest
+# value comfortable for a UFH-only install on this house. Do NOT raise
+# without per-zone risk review (verify floor covering, screed type, pipe
+# spacing, max permissible surface T per BS EN 1264-2 / NEN 1068).
+# -----------------------------------------------------------------------------
+modify:
+  number:
+    - id: "${devicename}_set_water_temperature_t1s_zone_1"
+      max_value: 40
+    # Zone-1 custom climate-curve heating setpoints — same UFH cap.
+    - id: "${devicename}_t1seth1"
+      max_value: 40
+    - id: "${devicename}_t1seth2"
+      max_value: 40
