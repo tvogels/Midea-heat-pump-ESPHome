@@ -1,0 +1,201 @@
+---
+# ============================================================================
+# Airwell WELLEA M HT (R290 monobloc) overlay
+# ----------------------------------------------------------------------------
+# Hardware:    Airwell Wellea M HT R290 monobloc (BDHW-***R-04M25 family,
+#              4–14 kW). Re-badged Midea M-thermal HT generation.
+# Controller:  Airwell RCW31 wired room controller (re-badged Midea KJR-120L).
+# Bus:         RS485, 9600 8N1, slave id 1, on the H1/H2 terminals
+#              (H1 = - / A,  H2 = + / B). ESPHome is the sole modbus master
+#              on this BMS pair. The RCW31 is NOT on H1/H2 — it talks to
+#              the IDU on a separate proprietary 2-wire pair (the IDU's
+#              wired-controller terminals, XYE/HBus-style framing). No bus
+#              contention, no need to coordinate with the RCW31.
+# Protocol:    Tested against firmware reporting reg 187 = 46 (V4.6).
+#              Reg 187 decode below also covers V4.7+.
+#
+# Scope
+# -----
+# This overlay captures things that are true for ANY Wellea M HT install:
+#  * two semantic corrections to the generic R290 base
+#    (reg 128 BIT 6/7, reg 187), validated empirically and against the
+#    Airwell V.E PDF;
+#  * five additional registers documented in V.E V4.6/V4.7 that the generic
+#    base does not yet expose (reg 188 extended fault, reg 189 BIT7/BIT8
+#    diagnostics, reg 612/613 capability bitmasks, reg 703 R290 leak
+#    sensor on the optional expansion board).
+#
+# Install-specific things (which entities to remove for a single-zone
+# install, custom safety caps for underfloor heating, etc.) belong in a
+# downstream site overlay that lists this file as its parent. See
+# `R290-airwell-wellea-m-ht-zwwg.yaml` for one example.
+#
+# Known firmware quirks (not patched here, documented for downstream users)
+# ------------------------------------------------------------------------
+#  * Reg 1 master-mode enum on this firmware is { 2 = Cool, 3 = Heat },
+#    NOT the V.E PDF's stated 0=Off / 1=Cool / 2=Heat / 3=H+DHW / 4=DHW /
+#    5=C+DHW. The generic base's `select.mode_select` happens to use the
+#    correct numeric values, so no replace is needed here. Independently
+#    confirmed via three RCW31 stimulus runs and a successful FC06 round-
+#    trip (Cool → Heat) on a live install.
+#  * Reg 6 climate-curve byte split is low-byte = Z1, high-byte = Z2.
+#    Values 1..8 = standard presets, value 9 = manual / custom curve
+#    (with the custom points in regs 261–268). The generic base already
+#    exposes both bytes as number sliders 1..9, so no replace is needed.
+#    Empirically confirmed via FC06 read-modify-write 0x0109 → 0x0103.
+# ============================================================================
+
+parent: R290-generic.yaml
+
+# -----------------------------------------------------------------------------
+# REPLACE — corrected V.E semantics (id stays for compatibility, lambda
+# and option map updated; `newid:` provides a clearer name).
+# -----------------------------------------------------------------------------
+replace:
+  binary_sensor:
+    # Reg 128 BIT 6 — both the V.E PDF and the generic base label this as
+    # the heating-mode mirror of the room-thermostat status:
+    #   * V.E PDF: "HT on/off status of room thermostat"
+    #   * generic base: "Heating Mode Set By Room Thermostat"
+    # On V4.6+ R290-A firmware that reading is wrong. Empirically the bit
+    # is the master-mode mirror for Heat: it tracks reg 1 = 3 (Heat) and
+    # is INDEPENDENT of any room-thermostat dry-contact change. Three
+    # independent stimulus runs prove it:
+    #   (1) bit was set BEFORE any room thermostat was wired to the unit;
+    #   (2) toggling the dry contact moved reg 0 BIT 1 / reg 16 / 199 /
+    #       129 BIT 5 but NOT reg 128;
+    #   (3) HMI Mode change AND FC06 write to reg 1 each moved the bit
+    #       in lock-step with reg 1, with thermostat state held constant.
+    # Best reading: the PDF label is vestigial from an older revision
+    # where the thermostat input was the mode source. On this firmware
+    # the room thermostat is a Z1-power-on gate (reg 0 BIT 1), and BIT 6
+    # / BIT 7 simply mirror the active master mode.
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Status BIT 1 Master Mode Mirror Heat"
+      id: "${devicename}_status_bit_1_heating_mode_set_by_room_thermostat"
+      newid: "${devicename}_status_bit_1_master_mode_heat"
+      icon: mdi:radiator
+      register_type: holding
+      address: 0x80
+      bitmask: 0x40
+      entity_category: diagnostic
+    # Reg 128 BIT 7 — same correction for the Cool master-mode mirror.
+    # V.E PDF labels this "CL on/off status of room thermostat"; on this
+    # firmware it is the master-mode mirror for Cool, going high when
+    # reg 1 = 2 (Cool), independent of thermostat dry-contact state.
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Status BIT 1 Master Mode Mirror Cool"
+      id: "${devicename}_status_bit_1_cooling_mode_set_by_room_thermostat"
+      newid: "${devicename}_status_bit_1_master_mode_cool"
+      icon: mdi:snowflake
+      register_type: holding
+      address: 0x80
+      bitmask: 0x80
+      entity_category: diagnostic
+
+  text_sensor:
+    # Reg 187 — the generic base labels this "MachineType" and decodes only
+    # the case 6 = A-R290 family code. Per the V.E PDF reg 187 is the
+    # **Modbus protocol version** (e.g. 46 = V4.6, 47 = V4.7). An empirical
+    # read on a Wellea M HT firmware returned 46, which has no meaning under
+    # the MachineType mapping. Replaced with the documented decode.
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Modbus Protocol Version"
+      id: "${devicename}_machinetype"
+      newid: "${devicename}_modbus_protocol_version"
+      icon: mdi:protocol
+      register_type: holding
+      address: 0xBB
+      lambda: |-
+        uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+        if (value == 0 || value == 0x7FFF) return std::string("Unknown");
+        char buf[16];
+        snprintf(buf, sizeof(buf), "V%d.%d", value / 10, value % 10);
+        return std::string(buf);
+
+# -----------------------------------------------------------------------------
+# ADD — V.E (V4.6/V4.7) registers not yet exposed by base + R290-generic.
+# -----------------------------------------------------------------------------
+add:
+  binary_sensor:
+    # Reg 189 BIT8 — temperature-precision flag.
+    # 0 = 1 °C resolution (integer); 1 = 0.1 °C (protocol value = actual ×10).
+    # Affects every register marked (1) or (2) in the V.E PDF. Exposed as a
+    # diagnostic so any drift is immediately visible — multiplier choices
+    # in this overlay assume BIT8 = 0.
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Status BIT 2 Temperature Precision (0=1°C, 1=0.1°C)"
+      id: "${devicename}_status_bit_2_temperature_precision"
+      icon: mdi:decimal-comma
+      register_type: holding
+      address: 0xBD       # reg 189
+      bitmask: 0x100      # BIT8
+      entity_category: diagnostic
+    # Reg 189 BIT7 — power-phase indicator (single vs three-phase).
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Status BIT 2 Power Phase"
+      id: "${devicename}_status_bit_2_power_phase"
+      icon: mdi:sine-wave
+      register_type: holding
+      address: 0xBD       # reg 189
+      bitmask: 0x80       # BIT7
+      entity_category: diagnostic
+
+  sensor:
+    # Reg 188 — extended fault list (companion to reg 124).
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Error Code (extended)"
+      id: "${devicename}_error_code_extended"
+      icon: mdi:alert-circle
+      register_type: holding
+      address: 0xBC       # reg 188
+      value_type: U_WORD
+      entity_category: diagnostic
+    # Reg 612 — capability bitmask 1 (per V.E PDF: AHS / TBH-via-controller
+    # / energy correction / energy metering / sensor backup / double-zone
+    # room-thermostat enables, etc.). Exposed raw; downstream HA template
+    # sensors decode individual bits as needed.
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Capability Bitmask 612"
+      id: "${devicename}_capability_bitmask_612"
+      icon: mdi:format-list-bulleted-type
+      register_type: holding
+      address: 0x264      # reg 612
+      value_type: U_WORD
+      entity_category: diagnostic
+    # Reg 613 — capability bitmask 2 (reserved + future feature flags).
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Capability Bitmask 613"
+      id: "${devicename}_capability_bitmask_613"
+      icon: mdi:format-list-bulleted-type
+      register_type: holding
+      address: 0x265      # reg 613
+      value_type: U_WORD
+      entity_category: diagnostic
+    # Reg 703 — R290 refrigerant leak sensor (% LFL × 10).
+    # Lives on the optional expansion board. Returns 0x7FFF when the
+    # expansion board is not installed; a runtime lambda filter swallows
+    # that sentinel so the entity simply has no value when absent.
+    # Critical for an R290 install — surface this in HA dashboards.
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "R290 Refrigerant Concentration"
+      id: "${devicename}_r290_refrigerant_concentration"
+      icon: mdi:gas-cylinder
+      register_type: holding
+      address: 0x2BF      # reg 703
+      value_type: U_WORD
+      unit_of_measurement: "%LFL"
+      accuracy_decimals: 1
+      filters:
+        - lambda: |-
+            if (x == 0x7FFF) return {};   // expansion board absent
+            return x * 0.1f;              // protocol value = actual % LFL ×10
