@@ -1,2 +1,5 @@
 .vscode
 warmtepomp-debug.yaml
+secrets.yaml
+models/secrets.yaml
+.venv/
