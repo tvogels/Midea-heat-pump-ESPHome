@@ -67,6 +67,7 @@ modify:
       lambda: |-
         // Update the global var unmasked_value_register_272
         id(unmasked_value_register_272) = x;
+        id(unmasked_value_register_272_valid) = true;  // Shadow now holds a real value read from the heatpump
 
         // ESP_LOGI("Register 272","unmasked_value_register_272: %d",id(unmasked_value_register_272));
 
@@ -682,6 +683,7 @@ add:
       lambda: |-
         // Update the global var unmasked_value_register_273
         id(unmasked_value_register_273) = x;
+        id(unmasked_value_register_273_valid) = true;  // Shadow now holds a real value read from the heatpump
         return x;
     # Register: 274 -> This updates the global var unmasked_value_register_274
     - platform: modbus_controller
@@ -696,6 +698,7 @@ add:
       lambda: |-
         // Update the global var unmasked_value_register_274
         id(unmasked_value_register_274) = x;
+        id(unmasked_value_register_274_valid) = true;  // Shadow now holds a real value read from the heatpump
         return x;
     # Register: 277 -> This updates the global var unmasked_value_register_277
     - platform: modbus_controller
@@ -710,6 +713,7 @@ add:
       lambda: |-
         // Update the global var unmasked_value_register_277
         id(unmasked_value_register_277) = x;
+        id(unmasked_value_register_277_valid) = true;  // Shadow now holds a real value read from the heatpump
         return x;
     # Register: 278 -> This updates the global var unmasked_value_register_278
     - platform: modbus_controller
@@ -724,6 +728,7 @@ add:
       lambda: |-
         // Update the global var unmasked_value_register_278
         id(unmasked_value_register_278) = x;
+        id(unmasked_value_register_278_valid) = true;  // Shadow now holds a real value read from the heatpump
         return x;
   select:
     # Register: 273 -> Bit 0 - 7: Solar Function
@@ -742,6 +747,7 @@ add:
       lambda: |-
         // Update the global var unmasked_value_register_273
         id(unmasked_value_register_273) = x;
+        id(unmasked_value_register_273_valid) = true;  // Shadow now holds a real value read from the heatpump
 
         // Extract bits 0-7 for Solar Function (the lower byte (8 bits))
         uint8_t solar_func_value = x & 0xFF;
@@ -758,6 +764,10 @@ add:
         }
       write_lambda: |-
         // 'value' is the numeric value from the selected option (example: 0, 1, or 2)
+        if (!id(unmasked_value_register_273_valid)) {
+          ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_273 not yet read from heatpump, would clobber other bits");
+          return {};
+        }
         uint16_t current_reg_val = id(unmasked_value_register_273); // Original register value
         uint8_t new_solar_func_byte = (uint8_t)value;
 
@@ -771,6 +781,7 @@ add:
             new_value
           );
         ${devicename}->queue_command(set_payload_command);
+        id(unmasked_value_register_273) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
         return {};
   number:
     # Register: 273 -> Bit 8 - 15: DELTATSOL
@@ -788,6 +799,7 @@ add:
       lambda: |-
         // Store the full, unmasked register value in the global variable
         id(unmasked_value_register_273) = x;
+        id(unmasked_value_register_273_valid) = true;  // Shadow now holds a real value read from the heatpump
 
         // Extract bits 8-15 for DELTATSOL (the higher byte)
         uint8_t deltatsol_value = ((int)x >> 8) & 0xFF;
@@ -795,6 +807,10 @@ add:
 
       # Lambda to write the new DELTATSOL value
       write_lambda: |-
+        if (!id(unmasked_value_register_273_valid)) {
+          ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_273 not yet read from heatpump, would clobber other bits");
+          return {};
+        }
         uint16_t current_reg_val = id(unmasked_value_register_273); // Get the last known full register value
         uint8_t new_deltatsol_byte = x; // 'x' is the new setpoint value (int)
 
@@ -808,6 +824,7 @@ add:
             new_value
           );
         ${devicename}->queue_command(set_payload_command);
+        id(unmasked_value_register_273) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
         return {};
     # Register 275, default 0.85
     - platform: modbus_controller
@@ -854,12 +871,17 @@ add:
       lambda: |-
         // Store the full, unmasked register value in the global variable
         id(unmasked_value_register_277) = x;
+        id(unmasked_value_register_277_valid) = true;  // Shadow now holds a real value read from the heatpump
 
         // Extract the high byte (bits 8-15) for SETHEATER_Max
         uint8_t max_temp_value = ((int)x >> 8) & 0xFF;
 
         return (float)max_temp_value;
       write_lambda: |-
+        if (!id(unmasked_value_register_277_valid)) {
+          ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_277 not yet read from heatpump, would clobber other bits");
+          return {};
+        }
         uint16_t current_reg_val = id(unmasked_value_register_277); // Get the last known full register value
         uint8_t new_max_temp_byte = (uint8_t)x; // 'x' is the new setpoint (float)
 
@@ -874,6 +896,7 @@ add:
             new_value
           );
         ${devicename}->queue_command(set_payload_command);
+        id(unmasked_value_register_277) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
         return {};
     # Register 277 (low), default 30
     - platform: modbus_controller
@@ -890,11 +913,16 @@ add:
       lambda: |-
         // Store the full, unmasked register value in the global variable (can be redundant if Max is read often, but safe)
         id(unmasked_value_register_277) = x;
+        id(unmasked_value_register_277_valid) = true;  // Shadow now holds a real value read from the heatpump
 
         // Extract the low byte (bits 0-7) for SETHEATER_Min
         uint8_t min_temp_value = (int)x & 0xFF;
         return (float)min_temp_value;
       write_lambda: |-
+        if (!id(unmasked_value_register_277_valid)) {
+          ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_277 not yet read from heatpump, would clobber other bits");
+          return {};
+        }
         uint16_t current_reg_val = id(unmasked_value_register_277); // Get the last known full register value
         uint8_t new_min_temp_byte = (uint8_t)x; // 'x' is the new setpoint (float)
 
@@ -909,6 +937,7 @@ add:
             new_value
           );
         ${devicename}->queue_command(set_payload_command);
+        id(unmasked_value_register_277) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
         return {};
     # Register 278 (high), default 10
     - platform: modbus_controller
@@ -925,12 +954,17 @@ add:
       lambda: |-
         // Store the full, unmasked register value in the global variable
         id(unmasked_value_register_278) = x;
+        id(unmasked_value_register_278_valid) = true;  // Shadow now holds a real value read from the heatpump
 
         // Extract the high byte (bits 8-15) for SIGHEATER_Max
         uint8_t max_voltage_value = ((int)x >> 8) & 0xFF;
 
         return (float)max_voltage_value;
       write_lambda: |-
+        if (!id(unmasked_value_register_278_valid)) {
+          ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_278 not yet read from heatpump, would clobber other bits");
+          return {};
+        }
         uint16_t current_reg_val = id(unmasked_value_register_278); // Get the last known full register value
         uint8_t new_max_voltage_byte = (uint8_t)x; // 'x' is the new setpoint (float)
 
@@ -945,6 +979,7 @@ add:
             new_value
           );
         ${devicename}->queue_command(set_payload_command);
+        id(unmasked_value_register_278) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
         return {};
     # Register 278 (low), default 3
     - platform: modbus_controller
@@ -961,12 +996,17 @@ add:
       lambda: |-
         // Store the full, unmasked register value in the global variable
         id(unmasked_value_register_278) = x;
+        id(unmasked_value_register_278_valid) = true;  // Shadow now holds a real value read from the heatpump
 
         // Extract the low byte (bits 0-7) for SIGHEATER_Min
         uint8_t min_voltage_value = (int)x & 0xFF;
 
         return (float)min_voltage_value;
       write_lambda: |-
+        if (!id(unmasked_value_register_278_valid)) {
+          ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_278 not yet read from heatpump, would clobber other bits");
+          return {};
+        }
         uint16_t current_reg_val = id(unmasked_value_register_278); // Get the last known full register value
         uint8_t new_min_voltage_byte = (uint8_t)x; // 'x' is the new setpoint (float)
 
@@ -981,6 +1021,7 @@ add:
             new_value
           );
         ${devicename}->queue_command(set_payload_command);
+        id(unmasked_value_register_278) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
         return {};
     - platform: modbus_controller
       modbus_controller_id: "${devicename}"
@@ -1124,6 +1165,10 @@ add:
       on_turn_on:
         - lambda: |-
             uint16_t checked_bit = 0x1;
+            if (!id(unmasked_value_register_274_valid)) {
+              ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_274 not yet read from heatpump, would clobber other bits");
+              return;
+            }
             uint16_t new_value = id(unmasked_value_register_274);  // The original unmasked value
             new_value &= ~checked_bit;                             // Clear and set
             new_value += checked_bit;
@@ -1141,6 +1186,10 @@ add:
       on_turn_off:
         - lambda: |-
             uint16_t checked_bit = 0x1;
+            if (!id(unmasked_value_register_274_valid)) {
+              ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_274 not yet read from heatpump, would clobber other bits");
+              return;
+            }
             uint16_t new_value = id(unmasked_value_register_274);  // The original unmasked value
             new_value &= ~checked_bit;                             // Clear and set
             if ((new_value) != id(unmasked_value_register_274)) {

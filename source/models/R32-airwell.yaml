@@ -97,6 +97,10 @@ replace:
       on_turn_on:
         - lambda: |-
             uint16_t checked_bit = 0x20;
+            if (!id(unmasked_value_register_210_valid)) {
+              ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+              return;
+            }
             uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
             new_value &= ~checked_bit;                             // Clear and set
             new_value += checked_bit;
@@ -109,6 +113,10 @@ replace:
       on_turn_off:
         - lambda: |-
             uint16_t checked_bit = 0x20;
+            if (!id(unmasked_value_register_210_valid)) {
+              ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+              return;
+            }
             uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
             new_value &= ~checked_bit;                             // Clear and set
             if ((new_value) != id(unmasked_value_register_210)) {
