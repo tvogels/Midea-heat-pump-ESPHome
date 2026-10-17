@@ -317,6 +317,7 @@ modify:
       lambda: |-
         // Update the global var unmasked_value_water_temperature_t1s
         id(unmasked_value_water_temperature_t1s) = x;
+        id(unmasked_value_water_temperature_t1s_valid) = true;  // Shadow now holds a real value read from the heatpump
 
         // ESP_LOGI("","unmasked_value_water_temperature_t1s: %d",id(unmasked_value_water_temperature_t1s));
         uint8_t value_bytes[2];
@@ -354,6 +355,7 @@ modify:
       lambda: |-
         // Update the global var unmasked_curve_selection
         id(unmasked_curve_selection) = x;
+        id(unmasked_curve_selection_valid) = true;  // Shadow now holds a real value read from the heatpump
 
         // ESP_LOGI("","unmasked_curve_selection: %d",id(unmasked_curve_selection));
 
