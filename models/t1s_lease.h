@@ -21,9 +21,19 @@
 // Heat-pump EEPROM budget:
 //   * mid-lease T1S changes are rate limited to one write per
 //     min_write_interval (default 900 s) and always carry the *latest*
-//     target; a target equal to the applied value writes nothing.
+//     target; a target equal to the applied value writes nothing. The same
+//     interval also gates the *takeover* T1S write (it spans sessions, so
+//     release -> set churn cannot bypass it); a gated takeover write is
+//     deferred to the next slot while the lease runs. Restore writes are never
+//     gated (safety), but they count as the last T1S write.
 //   * restore retries back off exponentially (60 s doubling, capped at 1 h),
 //     retry only the failed ops, and stop writing after MAX_RESTORE_CYCLES.
+//     release() can re-arm a halted restore at most once per REARM_MIN_MS.
+//
+// Known race (inherent, not detectable): if HA or the wired controller
+// writes T1S after our fresh OP_READ but before our write lands, their change
+// is overwritten and no drift is reported. The window is one Modbus round
+// trip during TAKEOVER or a rate-limited mid-lease write.
 #pragma once
 
 #include "esphome/core/hal.h"
@@ -65,7 +75,9 @@ static const uint8_t MAX_RESTORE_CYCLES = 8;    // 1+2+4+...+60 min ≈ 2.1 h of
 static const uint32_t BOOT_RESTORE_DELAY_MS = 30000;
 static const uint32_t DRIFT_GRACE_MS = 30000;   // > stock poll interval (10 s) after our last I/O
 static const uint32_t DHW_WATCH_MS = 30000;
+static const uint32_t REARM_MIN_MS = 3600000;   // release() may re-arm a halted restore once per hour
 static const uint32_t SNAPSHOT_MAGIC = 0x7153A001;
+static const uint8_t SNAP_FLAG_SKIP_T1S = 0x01;  // user adopted a T1S during the lease: restore WC only
 
 // Persisted only on supervision start and cleared after a verified restore
 // (or when a user change is adopted): two flash writes per session, none on
@@ -75,7 +87,7 @@ struct Snapshot {
   uint8_t wc_z1_was_on;
   uint8_t t1s_z1;
   uint8_t pending;  // 1 = a restore is owed
-  uint8_t reserved;
+  uint8_t flags;  // SNAP_FLAG_*
 };
 
 // One masked read-modify-write with read-back verification.
@@ -101,8 +113,10 @@ enum class Io : uint8_t { NONE, SNAP_READ, OP_READ, VERIFY_WAIT, VERIFY_READ };
 class T1sLease {
  public:
   void setup(ModbusController *dev, uint16_t *shadow_reg0, uint16_t *shadow_reg2, uint16_t *shadow_reg5,
-             uint32_t min_write_interval_s) {
+             bool *shadow_reg2_valid, bool *shadow_reg5_valid, uint32_t min_write_interval_s) {
     dev_ = dev;
+    shadow_reg2_valid_ = shadow_reg2_valid;
+    shadow_reg5_valid_ = shadow_reg5_valid;
     shadow_reg0_ = shadow_reg0;
     shadow_reg2_ = shadow_reg2;
     shadow_reg5_ = shadow_reg5;
@@ -135,6 +149,7 @@ class T1sLease {
     if (!std::isnan(unit_max) && unit_max > 0 && t1s > unit_max) return error_("rejected t1s above unit upper limit");
     if (lease_s < (int) LEASE_MIN_S) return error_("rejected lease_s < 10");
     if (restore_owed_()) return error_("rejected: restore pending");
+    if (release_pending_) return error_("rejected: release pending");
 
     target_ = (uint8_t) t1s;  // latest target always wins; written lazily
     start_lease_(lease_s);
@@ -152,12 +167,19 @@ class T1sLease {
 
   void renew(int lease_s) {
     if (mode_ != Mode::TAKEOVER && mode_ != Mode::SUPERVISING) return error_("renew ignored: not supervising");
+    if (release_pending_) return error_("rejected: release pending");
     if (lease_s < (int) LEASE_MIN_S) return error_("rejected lease_s < 10");
     start_lease_(lease_s);  // no Modbus, no flash
   }
 
   void release() {
     if (mode_ == Mode::RESTORE_HALTED) {
+      uint32_t now = esphome::millis();
+      if (rearmed_ && now - last_rearm_ms_ < REARM_MIN_MS) {
+        return error_("rejected re-arm: at most once per hour while restore is halted");
+      }
+      rearmed_ = true;
+      last_rearm_ms_ = now;
       ESP_LOGW(TAG, "Release while halted: re-arming restore (one more backoff series)");
       restore_cycles_ = 0;
       start_restore_cycle_();
@@ -173,6 +195,9 @@ class T1sLease {
   void loop() {
     uint32_t now = esphome::millis();
     observe_dhw_(now);
+    // Once the interval has elapsed, stay "allowed": avoids a false block when
+    // millis() - last write wraps after 49.7 days without a T1S write.
+    if (t1s_written_ && now - last_t1s_write_ms_ >= min_write_interval_ms_) t1s_written_ = false;
 
     if ((mode_ == Mode::TAKEOVER || mode_ == Mode::SUPERVISING) && !release_pending_ && lease_remaining_s() == 0) {
       ESP_LOGW(TAG, "Lease expired -> restoring");
@@ -197,7 +222,7 @@ class T1sLease {
 
     if (mode_ == Mode::SUPERVISING && io_ == Io::NONE && ops_.empty()) {
       if (check_drift_(now)) return;
-      if (target_ != applied_t1s_ && (!t1s_written_ || now - last_t1s_write_ms_ >= min_write_interval_ms_)) {
+      if (target_ != applied_t1s_ && !t1s_rate_limited_(now)) {
         ESP_LOGI(TAG, "Supervised T1S change %u -> %u", applied_t1s_, target_);
         ops_.push_back({REG_T1S, MASK_T1S_Z1, target_, true});
         next_op_();
@@ -239,6 +264,10 @@ class T1sLease {
   }
 
  protected:
+  bool t1s_rate_limited_(uint32_t now) const {
+    return t1s_written_ && now - last_t1s_write_ms_ < min_write_interval_ms_;
+  }
+
   bool restore_owed_() const {
     return mode_ == Mode::RESTORING || mode_ == Mode::RESTORE_BACKOFF || mode_ == Mode::RESTORE_HALTED;
   }
@@ -275,6 +304,7 @@ class T1sLease {
   // Lease expired or released (TAKEOVER or SUPERVISING).
   void end_supervision_() {
     lease_ms_ = 0;
+    t1s_alt_valid_ = false;
     if (mode_ == Mode::TAKEOVER && !have_snapshot_) {
       // Nothing was changed yet (snapshot not taken): nothing to undo.
       accept_seq_ = ++seq_;  // ignore the in-flight snapshot response
@@ -295,7 +325,9 @@ class T1sLease {
     restore_ops_.clear();
     // WC first: it is the actual safety net and must not wait on T1S.
     if (snap_.wc_z1_was_on) restore_ops_.push_back({REG_OPTIONS, MASK_WC_Z1, MASK_WC_Z1, false});
-    if (snap_.t1s_z1 >= SNAP_T1S_MIN && snap_.t1s_z1 <= SNAP_T1S_MAX) {
+    if (snap_.flags & SNAP_FLAG_SKIP_T1S) {
+      ESP_LOGI(TAG, "T1S z1 not restored: user setting adopted during the lease");
+    } else if (snap_.t1s_z1 >= SNAP_T1S_MIN && snap_.t1s_z1 <= SNAP_T1S_MAX) {
       restore_ops_.push_back({REG_T1S, MASK_T1S_Z1, snap_.t1s_z1, false});
     } else {
       error_("snapshot T1S " + std::to_string(snap_.t1s_z1) + " out of range 5..65, T1S not restored");
@@ -341,14 +373,17 @@ class T1sLease {
     switch (mode_) {
       case Mode::TAKEOVER:
         set_mode_(Mode::SUPERVISING);
+        clear_error_();  // verified takeover
         ESP_LOGI(TAG, "Supervising: WC z1 off, T1S z1 %u", applied_t1s_);
         break;
       case Mode::RESTORING:
         if (failed_.empty()) {
           restore_count_++;
           have_snapshot_ = false;
+          rearmed_ = false;
           persist_(0);
           set_mode_(Mode::IDLE);
+          clear_error_();  // verified restore
           ESP_LOGI(TAG, "Restore verified (WC z1 %s, T1S z1 %u)", snap_.wc_z1_was_on ? "on" : "off", snap_.t1s_z1);
         } else {
           restore_ops_ = failed_;  // retry only what failed
@@ -406,7 +441,7 @@ class T1sLease {
       snap_.magic = SNAPSHOT_MAGIC;
       snap_.wc_z1_was_on = (v5 & MASK_WC_Z1) ? 1 : 0;
       snap_.t1s_z1 = v2 & MASK_T1S_Z1;
-      snap_.reserved = 0;
+      snap_.flags = 0;
       have_snapshot_ = true;
       persist_(1);  // must survive an immediate reboot
       applied_t1s_ = snap_.t1s_z1;
@@ -422,9 +457,18 @@ class T1sLease {
     Op &op = ops_.front();
     uint16_t v = regs[0];
     update_shadow_(reg, v);  // real read: the shadow follows the unit, never our intent
-    if (reg == REG_T1S) applied_t1s_ = v & MASK_T1S_Z1;
+    if (reg == REG_T1S) {
+      applied_t1s_ = v & MASK_T1S_Z1;
+      t1s_alt_valid_ = false;  // a real read resolves any uncertainty
+    }
     if ((v & op.mask) == op.bits) return op_done_(true, "");  // already as desired, or verified
     if (io_ == Io::VERIFY_READ) return attempt_failed_("read-back mismatch reg " + std::to_string(reg));
+    if (mode_ == Mode::TAKEOVER && reg == REG_T1S && t1s_rate_limited_(esphome::millis())) {
+      // Session churn must not bypass the EEPROM rate limit: defer the T1S
+      // write; SUPERVISING writes target_ at the next slot.
+      ESP_LOGW(TAG, "Takeover T1S write deferred by rate limit (T1S z1 stays %u)", applied_t1s_);
+      return op_done_(true, "");
+    }
     uint16_t nv = (v & ~op.mask) | op.bits;
     ESP_LOGI(TAG, "Write reg %u: 0x%04X -> 0x%04X (heat-pump write #%u since boot)", reg, v, nv,
              (unsigned) (write_count_ + 1));
@@ -479,6 +523,11 @@ class T1sLease {
           // Keep the lease; retry at the next rate-limit slot.
           last_t1s_write_ms_ = esphome::millis();
           t1s_written_ = true;
+          // The write may have landed without being verified: accept both
+          // the last verified value and the target until a real read decides,
+          // so the next stock poll is not mistaken for a user change.
+          t1s_alt_ = op.bits & MASK_T1S_Z1;
+          t1s_alt_valid_ = true;
           break;
         default:
           break;
@@ -493,19 +542,41 @@ class T1sLease {
     if (now - last_io_end_ms_ < DRIFT_GRACE_MS) return false;
     if (shadow_reg2_ == nullptr || shadow_reg5_ == nullptr) return false;
     uint16_t r2 = *shadow_reg2_, r5 = *shadow_reg5_;
-    std::string what;
-    if (r5 & MASK_WC_Z1) {
-      what = "WC z1 switched on";
-    } else if ((r2 & MASK_T1S_Z1) != applied_t1s_) {
-      what = "T1S z1 " + std::to_string(applied_t1s_) + " -> " + std::to_string(r2 & MASK_T1S_Z1);
+    uint8_t t = r2 & MASK_T1S_Z1;
+    if (t1s_alt_valid_ && t == t1s_alt_) {
+      // The unverified write did land: that is our value, not drift.
+      applied_t1s_ = t;
+      t1s_alt_valid_ = false;
     }
-    if (what.empty()) return false;
+    if (r5 & MASK_WC_Z1) {
+      // The user switched the curve back on: adopt everything, restore nothing.
+      drift_count_++;
+      have_snapshot_ = false;
+      lease_ms_ = 0;
+      t1s_alt_valid_ = false;
+      persist_(0);
+      set_mode_(Mode::IDLE);
+      error_("external change during lease (WC z1 switched on): supervision ended, user setting adopted, no restore");
+      return true;
+    }
+    if (t == applied_t1s_) return false;
+    // T1S-only change: adopt the user's T1S (never write it back), but WC was
+    // switched off by us, so still restore it if it was on.
     drift_count_++;
-    have_snapshot_ = false;
+    std::string what = "T1S z1 " + std::to_string(applied_t1s_) + " -> " + std::to_string(t);
     lease_ms_ = 0;
-    persist_(0);  // adopt the user's setting: no restore owed
-    set_mode_(Mode::IDLE);
-    error_("external change during lease (" + what + "): supervision ended, user setting adopted, no restore");
+    t1s_alt_valid_ = false;
+    if (!snap_.wc_z1_was_on) {
+      have_snapshot_ = false;
+      persist_(0);
+      set_mode_(Mode::IDLE);
+      error_("external change during lease (" + what + "): supervision ended, user T1S adopted, nothing to restore");
+      return true;
+    }
+    snap_.flags |= SNAP_FLAG_SKIP_T1S;
+    persist_(1);  // a reboot must still restore WC, but not T1S
+    error_("external change during lease (" + what + "): user T1S adopted, restoring WC z1 only");
+    begin_restore_();
     return true;
   }
 
@@ -527,14 +598,29 @@ class T1sLease {
   }
 
   void update_shadow_(uint16_t reg, uint16_t v) {
-    if (reg == REG_T1S && shadow_reg2_) *shadow_reg2_ = v;
-    if (reg == REG_OPTIONS && shadow_reg5_) *shadow_reg5_ = v;
+    if (reg == REG_T1S && shadow_reg2_) {
+      *shadow_reg2_ = v;
+      if (shadow_reg2_valid_) *shadow_reg2_valid_ = true;  // PR #1 RMW guard: real read
+    }
+    if (reg == REG_OPTIONS && shadow_reg5_) {
+      *shadow_reg5_ = v;
+      if (shadow_reg5_valid_) *shadow_reg5_valid_ = true;
+    }
+  }
+
+  void clear_error_() {
+    if (!last_error_.empty()) {
+      last_error_.clear();
+      changed_ = true;
+    }
   }
 
   ModbusController *dev_{nullptr};
   uint16_t *shadow_reg0_{nullptr};
   uint16_t *shadow_reg2_{nullptr};
   uint16_t *shadow_reg5_{nullptr};
+  bool *shadow_reg2_valid_{nullptr};
+  bool *shadow_reg5_valid_{nullptr};
   esphome::ESPPreferenceObject pref_;
   Snapshot snap_{};
   bool have_snapshot_{false};
@@ -543,6 +629,10 @@ class T1sLease {
   bool release_pending_{false};
   uint8_t target_{0};
   uint8_t applied_t1s_{0};
+  uint8_t t1s_alt_{0};          // possibly-applied target after an unverified write
+  bool t1s_alt_valid_{false};
+  bool rearmed_{false};
+  uint32_t last_rearm_ms_{0};
   uint32_t min_write_interval_ms_{900000};
   uint32_t lease_start_ms_{0};
   uint32_t lease_ms_{0};

@@ -36,6 +36,8 @@ esphome:
                                       &id(unmasked_value_register_0),  // observed only (DHW bit)
                                       &id(unmasked_value_water_temperature_t1s),
                                       &id(unmasked_value_register_5),
+                                      &id(unmasked_value_water_temperature_t1s_valid),
+                                      &id(unmasked_value_register_5_valid),
                                       ${t1s_min_write_interval_s});
 
 api:
