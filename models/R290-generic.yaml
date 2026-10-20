@@ -51,6 +51,54 @@ globals:
     type: uint16_t
     restore_value: no
     initial_value: '0'
+  - id: unmasked_value_register_0_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_register_5_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_water_temperature_t1s_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_curve_selection_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_register_210_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_register_211_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_register_270_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_register_272_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_register_273_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_register_274_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_register_277_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_register_278_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
   - id: compressor_start_count
     type: int
     restore_value: no
@@ -171,6 +219,7 @@ select:
     lambda: |-
       // Update the global var unmasked_value_register_272
       id(unmasked_value_register_272) = x;
+      id(unmasked_value_register_272_valid) = true;  // Shadow now holds a real value read from the heatpump
 
       // ESP_LOGI("Register 272","unmasked_value_register_272: %d",id(unmasked_value_register_272));
 
@@ -195,6 +244,10 @@ select:
       return string_result;
     write_lambda: |-
       // ESP_LOGD("Register 272", "zone1_h_emission Set option to %s (%lld)", x.c_str(), value);
+      if (!id(unmasked_value_register_272_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_272 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t new_value = id(unmasked_value_register_272);  // The original unmasked value
       uint8_t value_byte = value;                            // New byte value with the heating emission type for zone 1
       new_value &= 0xFFF0;     // Clear the first 4 bits
@@ -202,6 +255,7 @@ select:
       // ESP_LOGD("Register 272", "Original value: %d -> New value: %d", id(unmasked_value_register_272), new_value);
       esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 0x110, new_value);
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_272) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
       return {};
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -241,6 +295,10 @@ select:
       return string_result;
     write_lambda: |-
       // ESP_LOGD("Register 272", "zone2_h_emission Set option to %s (%lld)", x.c_str(), value);
+      if (!id(unmasked_value_register_272_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_272 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t new_value = id(unmasked_value_register_272);  // The original unmasked value
       uint8_t value_byte = value;                            // New byte value with the heating emission type for zone 2
       new_value &= 0xFF0F;             // Clear the second pair of 4 bits
@@ -248,6 +306,7 @@ select:
       // ESP_LOGI("Register 272", "Original value: %d -> New value: %d", id(unmasked_value_register_272), new_value);
       esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 0x110, new_value);
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_272) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
       return {};
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -287,6 +346,10 @@ select:
       return string_result;
     write_lambda: |-
       // ESP_LOGI("Register 272", "zone1_c_emission Set option to %s (%lld)", x.c_str(), value);
+      if (!id(unmasked_value_register_272_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_272 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t new_value = id(unmasked_value_register_272);  // The original unmasked value
       uint8_t value_byte = value;                            // New byte value with the cooling emission type for zone 1
       new_value &= 0xF0FF;             // Clear the third pair of 4 bits
@@ -294,6 +357,7 @@ select:
       // ESP_LOGI("Register 272", "Original value: %d -> New value: %d", id(unmasked_value_register_272), new_value);
       esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 0x110, new_value);
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_272) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
       return {};
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -333,6 +397,10 @@ select:
       return string_result;
     write_lambda: |-
       // ESP_LOGI("Register 272", "zone2_c_emission Set option to %s (%lld)", x.c_str(), value);
+      if (!id(unmasked_value_register_272_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_272 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t new_value = id(unmasked_value_register_272);  // The original unmasked value
       uint8_t value_byte = value;                            // New byte value with the cooling emission type for zone 2
       new_value &= 0x0FFF;              // Clear the fourth pair of 4 bits
@@ -340,6 +408,7 @@ select:
       // ESP_LOGI("Register 272", "Original value: %d -> New value: %d", id(unmasked_value_register_272), new_value);
       esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 0x110, new_value);
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_272) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
       return {};
 
   - platform: modbus_controller
@@ -357,6 +426,7 @@ select:
     lambda: |-
       // Update the global var unmasked_value_register_273
       id(unmasked_value_register_273) = x;
+      id(unmasked_value_register_273_valid) = true;  // Shadow now holds a real value read from the heatpump
 
       // Extract bits 0-7 for Solar Function (the lower byte (8 bits))
       uint8_t solar_func_value = x & 0xFF;
@@ -373,6 +443,10 @@ select:
       }
     write_lambda: |-
       // 'value' is the numeric value from the selected option (example: 0, 1, or 2)
+      if (!id(unmasked_value_register_273_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_273 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t current_reg_val = id(unmasked_value_register_273); // Original register value
       uint8_t new_solar_func_byte = (uint8_t)value;
 
@@ -386,6 +460,7 @@ select:
           new_value
         );
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_273) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
       return {};
 sensor:
   - platform: template
@@ -426,6 +501,7 @@ sensor:
     lambda: |-
       // Update the global var unmasked_value_register_0
       id(unmasked_value_register_0) = x;
+      id(unmasked_value_register_0_valid) = true;  // Shadow now holds a real value read from the heatpump
       return x;
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -439,6 +515,7 @@ sensor:
     lambda: |-
       // Update the global var unmasked_value_register_5
       id(unmasked_value_register_5) = x;
+      id(unmasked_value_register_5_valid) = true;  // Shadow now holds a real value read from the heatpump
       return x;
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -1056,6 +1133,7 @@ sensor:
     lambda: |-
       // Update the global var unmasked_value_register_210
       id(unmasked_value_register_210) = x;
+      id(unmasked_value_register_210_valid) = true;  // Shadow now holds a real value read from the heatpump
       return x;
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -1069,6 +1147,7 @@ sensor:
     lambda: |-
       // Update the global var unmasked_value_register_211
       id(unmasked_value_register_211) = x;
+      id(unmasked_value_register_211_valid) = true;  // Shadow now holds a real value read from the heatpump
       return x;
   - platform: template
     name: "T1S DHW"
@@ -1559,6 +1638,7 @@ sensor:
     lambda: |-
       // Update the global var unmasked_value_register_273
       id(unmasked_value_register_273) = x;
+      id(unmasked_value_register_273_valid) = true;  // Shadow now holds a real value read from the heatpump
       return x;
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -1572,6 +1652,7 @@ sensor:
     lambda: |-
       // Update the global var unmasked_value_register_274
       id(unmasked_value_register_274) = x;
+      id(unmasked_value_register_274_valid) = true;  // Shadow now holds a real value read from the heatpump
       return x;
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -1585,6 +1666,7 @@ sensor:
     lambda: |-
       // Update the global var unmasked_value_register_277
       id(unmasked_value_register_277) = x;
+      id(unmasked_value_register_277_valid) = true;  // Shadow now holds a real value read from the heatpump
       return x;
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -1598,6 +1680,7 @@ sensor:
     lambda: |-
       // Update the global var unmasked_value_register_278
       id(unmasked_value_register_278) = x;
+      id(unmasked_value_register_278_valid) = true;  // Shadow now holds a real value read from the heatpump
       return x;
 binary_sensor:
   - platform: template
@@ -2320,6 +2403,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x1;
+          if (!id(unmasked_value_register_0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2332,6 +2419,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x1;
+          if (!id(unmasked_value_register_0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           if ((new_value) != id(unmasked_value_register_0)) {
@@ -2351,6 +2442,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x2;                          // Affected bit number
+          if (!id(unmasked_value_register_0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2364,6 +2459,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x2;
+          if (!id(unmasked_value_register_0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           if ((new_value) != id(unmasked_value_register_0)) {
@@ -2384,6 +2483,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x4;
+          if (!id(unmasked_value_register_0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2396,6 +2499,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x4;
+          if (!id(unmasked_value_register_0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           if ((new_value) != id(unmasked_value_register_0)) {
@@ -2415,6 +2522,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x8;
+          if (!id(unmasked_value_register_0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2427,6 +2538,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x8;
+          if (!id(unmasked_value_register_0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           if ((new_value) != id(unmasked_value_register_0)) {
@@ -2446,6 +2561,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x10;                         // Bit to change
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2458,6 +2577,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x10;                         // Bit to change
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           if ((new_value) != id(unmasked_value_register_5)) {
@@ -2477,6 +2600,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x40;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2489,6 +2616,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x40;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           if ((new_value) != id(unmasked_value_register_5)) {
@@ -2508,6 +2639,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x80;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2520,6 +2655,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x80;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           if ((new_value) != id(unmasked_value_register_5)) {
@@ -2539,6 +2678,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x100;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2551,6 +2694,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x100;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           if ((new_value) != id(unmasked_value_register_5)) {
@@ -2570,6 +2717,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x400;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2582,6 +2733,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x400;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           //Clear and set
           if ((new_value) != id(unmasked_value_register_5)) {
@@ -2601,6 +2756,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x800;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2613,6 +2772,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x800;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           if ((new_value) != id(unmasked_value_register_5)) {
@@ -2632,6 +2795,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x1000;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2644,6 +2811,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x1000;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           if ((new_value) != id(unmasked_value_register_5)) {
@@ -2663,6 +2834,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x2000;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
@@ -2675,6 +2850,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x2000;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
           new_value &= ~checked_bit;                           //Clear and set
           if ((new_value) != id(unmasked_value_register_5)) {
@@ -2741,6 +2920,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x1;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -2753,6 +2936,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x1;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -2772,6 +2959,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x2;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -2784,6 +2975,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x2;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -2803,6 +2998,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x4;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -2815,6 +3014,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x4;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -2834,6 +3037,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x8;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -2846,6 +3053,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x8;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -2865,6 +3076,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x10;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -2877,6 +3092,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x10;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -2896,6 +3115,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x20;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -2908,6 +3131,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x20;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -2927,6 +3154,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x80;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -2939,6 +3170,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x80;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -2958,6 +3193,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x200;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -2970,6 +3209,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x200;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -2989,6 +3232,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x400;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3001,6 +3248,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x400;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -3020,6 +3271,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x1000;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3032,6 +3287,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x1000;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -3051,6 +3310,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x2000;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3063,6 +3326,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x2000;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -3082,6 +3349,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x8000;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3094,6 +3365,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x8000;
+          if (!id(unmasked_value_register_210_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_210)) {
@@ -3114,6 +3389,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x1;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3126,6 +3405,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x1;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3145,6 +3428,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x2;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3157,6 +3444,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x2;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3176,6 +3467,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x4;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3188,6 +3483,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x4;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3207,6 +3506,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x8;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3219,6 +3522,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x8;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3238,6 +3545,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x10;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3250,6 +3561,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x10;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3269,6 +3584,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x20;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3280,6 +3599,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x20;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3298,6 +3621,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x40;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3309,6 +3636,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x40;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3327,6 +3658,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x80;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3338,6 +3673,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x80;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3356,6 +3695,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x100;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3367,6 +3710,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x100;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3385,6 +3732,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x200;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3397,6 +3748,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x200;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3416,6 +3771,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x400;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3428,6 +3787,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x400;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3447,6 +3810,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x800;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3459,6 +3826,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x800;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3478,6 +3849,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x1000;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3490,6 +3865,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x1000;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3509,6 +3888,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x2000;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3521,6 +3904,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x2000;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3540,6 +3927,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x4000;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3552,6 +3943,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x4000;
+          if (!id(unmasked_value_register_211_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
@@ -3572,6 +3967,10 @@ switch:
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x1;
+          if (!id(unmasked_value_register_274_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_274 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_274);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           new_value += checked_bit;
@@ -3589,6 +3988,10 @@ switch:
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x1;
+          if (!id(unmasked_value_register_274_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_274 not yet read from heatpump, would clobber other bits");
+            return;
+          }
           uint16_t new_value = id(unmasked_value_register_274);  // The original unmasked value
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_274)) {
@@ -3620,6 +4023,7 @@ number:
     lambda: |-
       // Update the global var unmasked_value_water_temperature_t1s
       id(unmasked_value_water_temperature_t1s) = x;
+      id(unmasked_value_water_temperature_t1s_valid) = true;  // Shadow now holds a real value read from the heatpump
 
       // ESP_LOGI("","unmasked_value_water_temperature_t1s: %d",id(unmasked_value_water_temperature_t1s));
       uint8_t value_bytes[2];
@@ -3629,6 +4033,10 @@ number:
       // ESP_LOGI("Register 2Low","Zone 1 is %d    Zone 2 is %d", value_bytes[1], value_bytes[0]);
       return value_bytes[1];
     write_lambda: |-
+      if (!id(unmasked_value_water_temperature_t1s_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_water_temperature_t1s not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t value = id(unmasked_value_water_temperature_t1s); // The original unmasked value
       uint8_t value_byte = x;                                    // New byte value with the new temp for zone 1
       value &= 0xFF00;      // Clear the lower byte of the value
@@ -3664,6 +4072,10 @@ number:
       // ESP_LOGD("Register 2High","Zone 1 is %d    Zone 2 is %d", value_bytes[1], value_bytes[0]);
       return value_bytes[0];
     write_lambda: |-
+      if (!id(unmasked_value_water_temperature_t1s_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_water_temperature_t1s not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t value = id(unmasked_value_water_temperature_t1s); // The original unmasked value
       uint8_t value_byte = x;                                    // New byte value with the new temp for zone 2
       value &= 0x00FF;             // Clear the upper byte of the value
@@ -3725,6 +4137,7 @@ number:
     lambda: |-
       // Update the global var unmasked_curve_selection
       id(unmasked_curve_selection) = x;
+      id(unmasked_curve_selection_valid) = true;  // Shadow now holds a real value read from the heatpump
 
       // ESP_LOGI("","unmasked_curve_selection: %d",id(unmasked_curve_selection));
 
@@ -3738,6 +4151,10 @@ number:
 
       return value_bytes[1];
     write_lambda: |-
+      if (!id(unmasked_curve_selection_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_curve_selection not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t value = id(unmasked_curve_selection); // The original unmasked value
       uint8_t value_byte = x;                        // New byte value with the new temp for zone 1
 
@@ -3749,6 +4166,7 @@ number:
 
       esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 0x6, value);
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_curve_selection) = value;  // Optimistic shadow update so a second write before the next poll keeps this change
 
       return {};
   - platform: modbus_controller
@@ -3775,6 +4193,10 @@ number:
 
       return value_bytes[0];
     write_lambda: |-
+      if (!id(unmasked_curve_selection_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_curve_selection not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t value = id(unmasked_curve_selection); // The original unmasked value
       uint8_t value_byte = x;                        // New byte value with the new temp for zone 2
 
@@ -3783,6 +4205,7 @@ number:
 
       esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 0x6, value);
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_curve_selection) = value;  // Optimistic shadow update so a second write before the next poll keeps this change
 
       return {};
   - platform: modbus_controller
@@ -4385,6 +4808,7 @@ number:
     lambda: |-
       // Update the global var unmasked_value_register_270
       id(unmasked_value_register_270) = x;
+      id(unmasked_value_register_270_valid) = true;  // Shadow now holds a real value read from the heatpump
 
       float value_floats[2];
       uint16_t value = x;
@@ -4400,6 +4824,10 @@ number:
 
       return value_floats[1];
     write_lambda: |-
+      if (!id(unmasked_value_register_270_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_270 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t value = id(unmasked_value_register_270); // The original unmasked value
       float input = x * 2.0;                            // Multiply x (the input from the slider) by 2
 
@@ -4415,6 +4843,7 @@ number:
 
       esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 0x10e, value);
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_270) = value;  // Optimistic shadow update so a second write before the next poll keeps this change
 
       return {};
   - platform: modbus_controller
@@ -4434,6 +4863,7 @@ number:
     lambda: |-
       // Update the global var unmasked_value_register_270
       id(unmasked_value_register_270) = x;
+      id(unmasked_value_register_270_valid) = true;  // Shadow now holds a real value read from the heatpump
 
       float value_floats[2];
       uint16_t value = x;
@@ -4446,6 +4876,10 @@ number:
 
       return value_floats[0];
     write_lambda: |-
+      if (!id(unmasked_value_register_270_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_270 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t value = id(unmasked_value_register_270); // The original unmasked value
       float input = x * 2.0;                            // Multiply x (the input from the slider) by 2
 
@@ -4458,6 +4892,7 @@ number:
 
       esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 0x10e, value);
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_270) = value;  // Optimistic shadow update so a second write before the next poll keeps this change
 
       return {};
   - platform: modbus_controller
@@ -4489,12 +4924,17 @@ number:
     lambda: |-
       // Store the full, unmasked register value in the global variable
       id(unmasked_value_register_273) = x;
+      id(unmasked_value_register_273_valid) = true;  // Shadow now holds a real value read from the heatpump
 
       // Extract bits 8-15 for DELTATSOL (the higher byte)
       uint8_t deltatsol_value = ((int)x >> 8) & 0xFF;
       return (int)deltatsol_value;
 
     write_lambda: |-
+      if (!id(unmasked_value_register_273_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_273 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t current_reg_val = id(unmasked_value_register_273); // Get the last known full register value
       uint8_t new_deltatsol_byte = x; // 'x' is the new setpoint value (int)
 
@@ -4508,6 +4948,7 @@ number:
           new_value
         );
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_273) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
       return {};
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -4551,12 +4992,17 @@ number:
     lambda: |-
       // Store the full, unmasked register value in the global variable
       id(unmasked_value_register_277) = x;
+      id(unmasked_value_register_277_valid) = true;  // Shadow now holds a real value read from the heatpump
 
       // Extract the high byte (bits 8-15) for SETHEATER_Max
       uint8_t max_temp_value = ((int)x >> 8) & 0xFF;
 
       return (float)max_temp_value;
     write_lambda: |-
+      if (!id(unmasked_value_register_277_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_277 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t current_reg_val = id(unmasked_value_register_277); // Get the last known full register value
       uint8_t new_max_temp_byte = (uint8_t)x; // 'x' is the new setpoint (float)
 
@@ -4571,6 +5017,7 @@ number:
           new_value
         );
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_277) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
       return {};
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -4586,11 +5033,16 @@ number:
     lambda: |-
       // Store the full, unmasked register value in the global variable (can be redundant if Max is read often, but safe)
       id(unmasked_value_register_277) = x;
+      id(unmasked_value_register_277_valid) = true;  // Shadow now holds a real value read from the heatpump
 
       // Extract the low byte (bits 0-7) for SETHEATER_Min
       uint8_t min_temp_value = (int)x & 0xFF;
       return (float)min_temp_value;
     write_lambda: |-
+      if (!id(unmasked_value_register_277_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_277 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t current_reg_val = id(unmasked_value_register_277); // Get the last known full register value
       uint8_t new_min_temp_byte = (uint8_t)x; // 'x' is the new setpoint (float)
 
@@ -4605,6 +5057,7 @@ number:
           new_value
         );
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_277) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
       return {};
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -4620,12 +5073,17 @@ number:
     lambda: |-
       // Store the full, unmasked register value in the global variable
       id(unmasked_value_register_278) = x;
+      id(unmasked_value_register_278_valid) = true;  // Shadow now holds a real value read from the heatpump
 
       // Extract the high byte (bits 8-15) for SIGHEATER_Max
       uint8_t max_voltage_value = ((int)x >> 8) & 0xFF;
 
       return (float)max_voltage_value;
     write_lambda: |-
+      if (!id(unmasked_value_register_278_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_278 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t current_reg_val = id(unmasked_value_register_278); // Get the last known full register value
       uint8_t new_max_voltage_byte = (uint8_t)x; // 'x' is the new setpoint (float)
 
@@ -4640,6 +5098,7 @@ number:
           new_value
         );
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_278) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
       return {};
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -4655,12 +5114,17 @@ number:
     lambda: |-
       // Store the full, unmasked register value in the global variable
       id(unmasked_value_register_278) = x;
+      id(unmasked_value_register_278_valid) = true;  // Shadow now holds a real value read from the heatpump
 
       // Extract the low byte (bits 0-7) for SIGHEATER_Min
       uint8_t min_voltage_value = (int)x & 0xFF;
 
       return (float)min_voltage_value;
     write_lambda: |-
+      if (!id(unmasked_value_register_278_valid)) {
+        ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_278 not yet read from heatpump, would clobber other bits");
+        return {};
+      }
       uint16_t current_reg_val = id(unmasked_value_register_278); // Get the last known full register value
       uint8_t new_min_voltage_byte = (uint8_t)x; // 'x' is the new setpoint (float)
 
@@ -4675,6 +5139,7 @@ number:
           new_value
         );
       ${devicename}->queue_command(set_payload_command);
+      id(unmasked_value_register_278) = new_value;  // Optimistic shadow update so a second write before the next poll keeps this change
       return {};
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
