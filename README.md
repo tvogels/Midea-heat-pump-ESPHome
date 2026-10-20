@@ -33,6 +33,33 @@ In the `models` directory you will find multiple yaml files for specific models 
 
 *If you are not able to find a good fit in the models directory for your heat pump, then try the `R32-generic.yaml`, that will probably work.*
 
+## Supervised T1S lease (site-zwwg)
+
+`models/R290-airwell-wellea-m-ht-zwwg-lease.yaml` wraps the zwwg model (unchanged) and adds an on-device safety net for an external supervisor (Homage) that sets the Zone 1 supply temperature directly. Logic: `models/t1s_lease.h`. Flashing the plain zwwg model leaves behaviour unchanged.
+
+Native API actions (callable with aioesphomeapi, no Home Assistant needed):
+
+| Action | Effect |
+| --- | --- |
+| `set_supervised_t1s(t1s, lease_s)` | First call: fresh read of regs 2–5, snapshot of WC-zone-1 bit (reg 5 `0x1000`) and T1S zone 1 (reg 2 low byte) persisted to flash, then WC zone 1 off (only if it was on) and T1S z1 = `t1s`. Later calls: renew the lease; write T1S only if the value changed. |
+| `renew_lease(lease_s)` | Renew only. No Modbus traffic, no flash write. |
+| `release_supervision()` | Restore now. |
+
+- `t1s` must be within 20–40 °C (UFH cap) and within the unit's T1S heating limits (regs 203/204) when read; otherwise rejected (see *Last Error*). `lease_s` ≥ 10, capped at 7200 s. Lease timing uses wrap-safe `millis()` arithmetic.
+- On lease expiry, release, or boot with a pending snapshot (30 s after boot): restore T1S z1, then WC zone 1 on (only if it was on).
+- Every write is a masked read-modify-write from a fresh read of that single register (the wired controller shares the bus), is skipped if the bits already match (EEPROM wear), and is verified by read-back after 3 s, up to 3 attempts. Only reg 2 low byte and reg 5 bit 12 are ever written. Register 0 (power/DHW) and regs 6/7/8/212 are never touched.
+- Flash is written twice per supervision session (snapshot on start, clear after a verified restore). Renewals never write flash.
+- Entities: *T1S Supervision Active*, *T1S Lease Remaining*, *T1S Supervision Last Error*, *T1S Supervision Restore Count*.
+
+Homage pattern: call `set_supervised_t1s(target, 600)` every ~2 min (or `renew_lease(600)`). If Homage dies, the curve comes back within ≤10 min.
+
+Failure modes:
+- Snapshot read fails → supervision is not started and nothing is written.
+- Takeover write fails → whatever was applied is rolled back.
+- Restore fails → snapshot is kept and restore is retried every 60 s (also across reboots). *Supervision Active* stays on.
+- Someone changes T1S/WC on the wired controller during a lease → the restore still writes the snapshot values (the snapshot wins).
+- `api.reboot_timeout` is left at the default 15 min. A reboot mid-lease simply restores. Consider `0s` once Homage is the only API client.
+
 ## ESPHome Midea Heatpump Controller
 
 Together with my son [Sven](https://svenar.nl) who is an electronics student, we created an ESPHome compatible heatpump controller for the Midea heatpump (and clones). This controller can be purchased from https://shop.svenar.nl

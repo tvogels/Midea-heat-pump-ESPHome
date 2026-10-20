@@ -1,0 +1,87 @@
+# Wellea M HT (zwwg) + supervised T1S lease.
+#
+# Flash THIS file instead of R290-airwell-wellea-m-ht-zwwg.yaml to enable the
+# feature. It includes the generated model unchanged and only adds:
+#   * native API actions set_supervised_t1s / renew_lease / release_supervision
+#   * status entities
+#   * a 1 s interval driving the lease state machine (models/t1s_lease.h)
+# See README "Supervised T1S lease" for the contract.
+#
+# api.reboot_timeout is left at the ESPHome default (15 min): the ESP reboots
+# if no API client is connected for 15 min. That is harmless for this feature
+# (a reboot mid-lease triggers a restore from the persisted snapshot), but
+# when Homage becomes the only API client you will likely want
+# `reboot_timeout: 0s` so the ESP does not reboot whenever Homage is offline.
+# Not changed here on purpose.
+
+packages:
+  model: !include R290-airwell-wellea-m-ht-zwwg.yaml
+
+esphome:
+  includes:
+    - t1s_lease.h
+  on_boot:
+    # After the modbus_controller (setup_priority -10) is set up.
+    priority: -100
+    then:
+      - lambda: |-
+          t1s_lease::instance().setup(id(${devicename}),
+                                      &id(unmasked_value_water_temperature_t1s),
+                                      &id(unmasked_value_register_5));
+
+api:
+  actions:
+    - action: set_supervised_t1s
+      variables:
+        t1s: int
+        lease_s: int
+      then:
+        - lambda: |-
+            t1s_lease::instance().set_supervised(
+                t1s, lease_s,
+                id(${devicename}_temperature_lower_limit_of_t1s_heating_zone_1).state,
+                id(${devicename}_temperature_upper_limit_of_t1s_heating_zone_1).state);
+    - action: renew_lease
+      variables:
+        lease_s: int
+      then:
+        - lambda: "t1s_lease::instance().renew(lease_s);"
+    - action: release_supervision
+      then:
+        - lambda: "t1s_lease::instance().release();"
+
+interval:
+  - interval: 1s
+    then:
+      - lambda: "t1s_lease::instance().loop();"
+
+binary_sensor:
+  - platform: template
+    name: "T1S Supervision Active"
+    id: "${devicename}_t1s_supervision_active"
+    icon: mdi:shield-account
+    lambda: "return t1s_lease::instance().active();"
+
+sensor:
+  - platform: template
+    name: "T1S Lease Remaining"
+    id: "${devicename}_t1s_lease_remaining"
+    unit_of_measurement: s
+    accuracy_decimals: 0
+    update_interval: 10s
+    lambda: "return t1s_lease::instance().lease_remaining_s();"
+  - platform: template
+    name: "T1S Supervision Restore Count"
+    id: "${devicename}_t1s_restore_count"
+    accuracy_decimals: 0
+    state_class: total_increasing
+    update_interval: 60s
+    lambda: "return t1s_lease::instance().restore_count();"
+
+text_sensor:
+  - platform: template
+    name: "T1S Supervision Last Error"
+    id: "${devicename}_t1s_last_error"
+    icon: mdi:alert
+    update_interval: 10s
+    lambda: "return t1s_lease::instance().last_error();"
