@@ -14,6 +14,13 @@
 # `reboot_timeout: 0s` so the ESP does not reboot whenever Homage is offline.
 # Not changed here on purpose.
 
+substitutions:
+  # Minimum interval between mid-lease T1S (reg 2) writes to the heat pump.
+  # Each write is one heat-pump EEPROM write. 900 s = max 4/h = 96/day
+  # (~35k/year); a planner needing ~2 T1S changes per hour uses ~48/day
+  # (~17.5k/year). The latest target is always the one written.
+  t1s_min_write_interval_s: "900"
+
 packages:
   model: !include R290-airwell-wellea-m-ht-zwwg.yaml
 
@@ -26,8 +33,10 @@ esphome:
     then:
       - lambda: |-
           t1s_lease::instance().setup(id(${devicename}),
+                                      &id(unmasked_value_register_0),  // observed only (DHW bit)
                                       &id(unmasked_value_water_temperature_t1s),
-                                      &id(unmasked_value_register_5));
+                                      &id(unmasked_value_register_5),
+                                      ${t1s_min_write_interval_s});
 
 api:
   actions:
@@ -53,7 +62,20 @@ api:
 interval:
   - interval: 1s
     then:
-      - lambda: "t1s_lease::instance().loop();"
+      - lambda: |-
+          auto &l = t1s_lease::instance();
+          l.loop();
+          // Publish status on transitions, not only on the poll interval.
+          if (l.consume_changed()) {
+            id(${devicename}_t1s_supervision_active).publish_state(l.active());
+            id(${devicename}_t1s_lease_remaining).publish_state(l.lease_remaining_s());
+            id(${devicename}_t1s_restore_count).publish_state(l.restore_count());
+            id(${devicename}_t1s_hp_write_count).publish_state(l.write_count());
+            id(${devicename}_t1s_dhw_drop_count).publish_state(l.dhw_drop_count());
+            id(${devicename}_t1s_drift_count).publish_state(l.drift_count());
+            id(${devicename}_t1s_last_error).publish_state(l.last_error());
+            id(${devicename}_t1s_mode).publish_state(l.mode_name());
+          }
 
 binary_sensor:
   - platform: template
@@ -74,9 +96,33 @@ sensor:
     name: "T1S Supervision Restore Count"
     id: "${devicename}_t1s_restore_count"
     accuracy_decimals: 0
-    state_class: total_increasing
+    state_class: total_increasing  # since boot (resets on reboot)
     update_interval: 60s
     lambda: "return t1s_lease::instance().restore_count();"
+  - platform: template
+    name: "T1S Heat Pump Write Count"
+    id: "${devicename}_t1s_hp_write_count"
+    icon: mdi:chip
+    accuracy_decimals: 0
+    state_class: total_increasing  # reg 2/5 writes by the lease since boot
+    update_interval: 60s
+    lambda: "return t1s_lease::instance().write_count();"
+  - platform: template
+    name: "T1S DHW Drops After Lease Write"
+    id: "${devicename}_t1s_dhw_drop_count"
+    icon: mdi:water-boiler-alert
+    accuracy_decimals: 0
+    state_class: total_increasing
+    update_interval: 60s
+    lambda: "return t1s_lease::instance().dhw_drop_count();"
+  - platform: template
+    name: "T1S External Change Count"
+    id: "${devicename}_t1s_drift_count"
+    icon: mdi:account-switch
+    accuracy_decimals: 0
+    state_class: total_increasing
+    update_interval: 60s
+    lambda: "return t1s_lease::instance().drift_count();"
 
 text_sensor:
   - platform: template
@@ -85,3 +131,9 @@ text_sensor:
     icon: mdi:alert
     update_interval: 10s
     lambda: "return t1s_lease::instance().last_error();"
+  - platform: template
+    name: "T1S Supervision Mode"
+    id: "${devicename}_t1s_mode"
+    icon: mdi:state-machine
+    update_interval: 10s
+    lambda: "return {t1s_lease::instance().mode_name()};"
