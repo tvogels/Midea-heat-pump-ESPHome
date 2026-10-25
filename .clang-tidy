@@ -1,0 +1,21 @@
+# Bug-finding checks only; layout is clang-format's job. Run on
+# tests/test_helpers.cpp, which includes every header in include/.
+# Disabled:
+#   easily-swappable-parameters  flags most multi-argument signatures
+#   signed-bitwise               flags every uint16_t mask (promoted to int)
+#   exception-escape             only flags std::function calls in the test's main()
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  performance-*,
+  misc-misplaced-const,
+  misc-redundant-expression,
+  misc-unused-*,
+  readability-misleading-indentation,
+  readability-suspicious-call-argument,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-signed-bitwise,
+  -bugprone-exception-escape
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'include/.*'

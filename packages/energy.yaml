@@ -1,0 +1,423 @@
+# Energy counters, real-time capacity/power and COP (regs 143-186).
+
+sensor:
+  # Regs 143-144 (U_DWORD). R290: actual value x100, kWh.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Electricity Consumption"
+    id: "heatpump_electricity_consumption"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 143
+    value_type: U_DWORD
+    filters:
+      - lambda: return x * 0.01;
+    accuracy_decimals: 2
+
+  # Regs 145-146 (U_DWORD). R290: actual value x100, kWh.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Power Output"
+    id: "heatpump_power_output"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 145
+    value_type: U_DWORD
+    filters:
+      - lambda: return x * 0.01;
+    accuracy_decimals: 2
+
+  - platform: template
+    name: "Coefficient of Performance"
+    id: "heatpump_coefficient_of_performance"
+    icon: mdi:copyleft
+    accuracy_decimals: 2
+    unit_of_measurement: "COP"
+    lambda: |-
+      // Verify that electricity_consumption is <> 0 to avoid division by 0 error
+      if (id(heatpump_electricity_consumption).state != 0) {
+        return id(heatpump_power_output).state / id(heatpump_electricity_consumption).state;
+      } else {
+        return NAN;
+      }
+
+  # Regs 140/148/151/183/186 are signed (they read 652-654 during defrost as U_WORD).
+  # Renamed in PR #5 so old and new values never share an InfluxDB series (docs/entity-migration.csv).
+  - id: "heatpump_heating_capacity_signed"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Heating Capacity (signed)"
+    icon: mdi:lightning-bolt
+    register_type: holding
+    address: 148
+    value_type: S_WORD
+    unit_of_measurement: "kW"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Real-time renewable heating capacity"
+    id: "heatpump_realtime_renewable_heating_capacity"
+    icon: mdi:lightning-bolt
+    register_type: holding
+    address: 149
+    value_type: U_WORD
+    unit_of_measurement: "kW"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Real-time heating power consumption"
+    id: "heatpump_realtime_heating_power_consumption"
+    icon: mdi:lightning-bolt
+    register_type: holding
+    address: 150
+    value_type: U_WORD
+    unit_of_measurement: "kW"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_heating_cop_signed"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Heating COP (signed)"
+    icon: mdi:copyleft
+    register_type: holding
+    address: 151
+    value_type: S_WORD
+    unit_of_measurement: "COP"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  # Energy counters: U_DWORD pairs (reg N = high word, N+1 = low word).
+  - id: "heatpump_total_energy_produced_system_all_modes"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total Energy Produced for System (all modes)"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 152
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_total_renewable_energy_produced_system_all_modes"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total Renewable Energy Produced for System (all modes)"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 154
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_total_electricity_consumed_system_all_modes"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total Electricity Consumed for System (all modes)"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 156
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_total_heating_energy_produced_master_unit"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total Heating Energy Produced for Master Unit"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 158
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_total_heating_renewable_energy_produced_master_unit"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total Heating Renewable Energy Produced for Master Unit"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 160
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_total_heating_electricity_consumed_master_unit"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total Heating Electricity Consumed for Master Unit"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 162
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total COP in heating mode for master unit"
+    id: "heatpump_total_cop_in_heating_mode_for_master_unit"
+    icon: mdi:copyleft
+    register_type: holding
+    address: 164
+    unit_of_measurement: "COP"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_total_cooling_energy_produced_master_unit"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total Cooling Energy Produced for Master Unit"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 165
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_total_cooling_renewable_energy_produced_master_unit"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total Cooling Renewable Energy Produced for Master Unit"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 167
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_total_cooling_electricity_consumed_master_unit"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total Cooling Electricity Consumed for Master Unit"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 169
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total COP in cooling mode for master unit"
+    id: "heatpump_total_cop_in_cooling_mode_for_master_unit"
+    icon: mdi:copyleft
+    register_type: holding
+    address: 171
+    unit_of_measurement: "COP"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_total_dhw_energy_produced_master_unit"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total DHW Energy Produced for Master Unit"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 172
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_total_dhw_renewable_energy_produced_master_unit"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total DHW Renewable Energy Produced for Master Unit"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 174
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_total_dhw_electricity_consumed_master_unit"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total DHW Electricity Consumed for Master Unit"
+    icon: mdi:lightning-bolt-outline
+    register_type: holding
+    unit_of_measurement: "kWh"
+    device_class: energy
+    state_class: total_increasing
+    address: 176
+    value_type: U_DWORD
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total COP in DHW mode for master unit"
+    id: "heatpump_total_cop_in_dhw_mode_for_master_unit"
+    icon: mdi:copyleft
+    register_type: holding
+    address: 178
+    unit_of_measurement: "COP"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Real-time renewable cooling capacity"
+    id: "heatpump_realtime_renewable_cooling_capacity"
+    icon: mdi:lightning-bolt
+    register_type: holding
+    address: 179
+    value_type: U_WORD
+    unit_of_measurement: "kW"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Real-time cooling capacity"
+    id: "heatpump_realtime_cooling_capacity"
+    icon: mdi:lightning-bolt
+    register_type: holding
+    address: 180
+    value_type: U_WORD
+    unit_of_measurement: "kW"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Real-time cooling power consumption"
+    id: "heatpump_realtime_cooling_power_consumption"
+    icon: mdi:lightning-bolt
+    register_type: holding
+    address: 181
+    value_type: U_WORD
+    unit_of_measurement: "kW"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Real-time cooling EER"
+    id: "heatpump_realtime_cooling_eer"
+    icon: mdi:copyleft
+    register_type: holding
+    address: 182
+    value_type: U_WORD
+    unit_of_measurement: "COP"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_dhw_heating_capacity_signed"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "DHW Heating Capacity (signed)"
+    icon: mdi:lightning-bolt
+    register_type: holding
+    address: 183
+    value_type: S_WORD
+    unit_of_measurement: "kW"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Real-time renewable DHW heating capacity"
+    id: "heatpump_realtime_renewable_dhw_heating_capacity"
+    icon: mdi:lightning-bolt
+    register_type: holding
+    address: 184
+    value_type: U_WORD
+    unit_of_measurement: "kW"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Real-time DHW heating power consumption"
+    id: "heatpump_realtime_dhw_heating_power_consumption"
+    icon: mdi:lightning-bolt
+    register_type: holding
+    address: 185
+    value_type: U_WORD
+    unit_of_measurement: "kW"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_dhw_heating_cop_signed"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "DHW Heating COP (signed)"
+    icon: mdi:copyleft
+    register_type: holding
+    address: 186
+    value_type: S_WORD
+    unit_of_measurement: "COP"
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;

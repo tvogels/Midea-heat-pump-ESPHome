@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [site-zwwg]
+  pull_request:
+  workflow_dispatch:
+
+# Every step is a Makefile target; tool versions are pinned there.
+jobs:
+  helpers:
+    name: C++ helper tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: make test
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2  # no floating major tag upstream
+      - run: make lint
+
+  firmware:
+    name: Firmware (${{ matrix.config }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [heatpump.yaml, heatpump-lease.tmp.yaml]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+      - uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: platformio-${{ hashFiles('Makefile') }}
+      - name: Use dummy secrets
+        run: cp tests/secrets.ci.yaml secrets.yaml
+      - name: Validate
+        run: make config CONFIGS=${{ matrix.config }}
+      - name: Compile
+        run: make compile CONFIGS=${{ matrix.config }}

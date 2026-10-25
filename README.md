@@ -1,107 +1,107 @@
-# Midea heat pump (and clones) ESPHome
+# Heat pump controller (zwwg)
 
-The Midea heat pump and clones like [Airwell](https://www.airwell.com/en/), [Artel](https://www.artelgroup.com/products-heat-pumps/), [Ferroli](https://www.ferroli.com/int/products/hydronic-heat-pumps-cooling-heating-dhw), [Kaisai](https://www.kaisaisystems.nl), [Inventor](https://www.inventorairconditioner.com/heat-pumps-split-monoblock/split-type-heat-pumps/matrix-split-type), [Kaysun](https://www.kaysun.es/en/products-kaysun/aquantia/), [YORK](https://www.pompycieplayork.pl/produkty/) can be managed using the Modbus protocol. This project contains configuration file(s) which can be placed on an ESPHome enabled device to communicatie using modbus with the heat pump.
+ESPHome firmware that connects our **Airwell Wellea M HT R290** monobloc (a Midea OEM unit) to Home Assistant over Modbus RTU. It runs on a **LilyGO T-CAN485** (ESP32 + RS485) wired to the heat pump's wired controller.
 
-<span style="color: red;">**See below for a ready-made ESPHome compatible heatpump controller!!**</span>
+The site: one zone of underfloor heating in a cement screed (**max 40 °C water**), a DHW tank, no electric backup heaters.
 
+This is a trimmed fork of [Mosibi/Midea-heat-pump-ESPHome](https://github.com/Mosibi/Midea-heat-pump-ESPHome), which supports many models through a generator. We keep one model, written out as plain ESPHome YAML.
 
-<a href="https://www.buymeacoffee.com/Mosibi" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/default-yellow.png" alt="Buy Me A Coffee" height="41" width="174"></a>
+> **Disclaimer.** Writing Modbus registers changes how the heat pump runs. Everything here is used at your own risk. Disconnect power from the indoor and outdoor unit before opening anything.
 
-## Disclaimer
+## Layout
 
-The information provided for the heat pump is intended for informational purposes only. Its use is entirely at your own risk. We do not take any responsibility for any damage or loss caused by the use of information taken from this project. We strongly recommend that you consult with a professional HVAC technician before making any changes to your heat pump configuration or installation. By using the information from this project, you acknowledge that you understand and accept these terms and conditions.
+```
+heatpump.yaml                 entry point: lists the packages below
+packages/
+  hardware.yaml               board, Wi-Fi, API/OTA, UART, Modbus bus
+  controls.yaml               day-to-day controls: power, mode, setpoints, curve (regs 0-18)
+  telemetry.yaml              temperatures, compressor, fan, pressures, flow (regs 100-142, 191-192, 703)
+  energy.yaml                 energy counters, capacity, COP (regs 143-186)
+  status.yaml                 status bits, load outputs, faults, versions (regs 101, 124-131, 187-200, 612-613)
+  installer-settings.yaml     installer menu: limits, parameters, curve points (regs 201-279)
+  t1s-lease.yaml              opt-in: supervised T1S lease for an external controller
+include/
+  packed_register.h           safe register writes used by the YAML lambdas
+  decoders.h                  fault table and value-to-text decoders
+  t1s_lease.h                 lease state machine (only with t1s-lease.yaml)
+Makefile                      checks, builds, flashing (pinned tool versions)
+tests/                        host unit test for include/*.h (+ ESPHome stubs, CI secrets)
+.yamllint                     YAML lint config
+.clang-format, .clang-tidy    C++ format and lint configs
+docs/
+  registers.md                which registers we read and write, and how
+  t1s-lease.md                the lease contract
+  entity-migration.*          entity renames, for carrying over InfluxDB history
+homeassistant/                example dashboard and automations
+```
 
-## Connect a ESPHome board to the heat pump
+Each package is a normal ESPHome config fragment; ESPHome merges them. There is no generator and no inheritance: what you see is what gets compiled. Register numbers in comments are decimal and refer to the Midea 120L Modbus mapping table V.E.
 
-Connecting a device to the heat pump is not that difficult, but keep the disclaimer in mind. Before you start, disconnect the power from the indoor and the outdoor unit. Never ever open up the heat pump with the power switched on!!
+## Build and flash
 
-A modbus device has two wires, A+ and B- and optional a ground/earth connection. The modbus device needs to be connected to the "wired controller", this is the display on the model shown.
+Needs [uv](https://docs.astral.sh/uv/), make and a C++ compiler (on macOS: the Xcode command-line tools). Create `secrets.yaml` next to `heatpump.yaml` (it is git-ignored):
 
-![Indoor Unit](pictures/Midea-M-Thermal-Arctic.png)
+```yaml
+wifi_ssid: "..."
+wifi_password: "..."
+heatpump_fallback_ap_password: "..."
+heatpump_ota_password: "..."
+heatpump_api_encryption_key: "..."   # 32 random bytes, base64
+```
 
-Detach the front panel of the indoor unit (slide it up) and on the backside you will find a panel that holds the display (wired controller). Open that panel, be warned that the screws used are not alway of the best quality, so use a good fitting screw driver and be gentle.
+Then:
 
-When the panel of the display is removed, the back of the display is visible, which is a printed circuit board (PCB). On that board, search for the 'earth' connection (letter E) and connections H1 and H2. Attach the earth wire of your modbus device to the earth connection, the B- wire to H1 and A+ wire to H2.
+```sh
+make run     # compile + flash heatpump.yaml (USB or OTA)
+make logs    # stream logs from heatpump.local (DEVICE=... for another host)
+```
 
-![Wired Controller](pictures/wired_controller.png)
+Before pushing, run `make` (same as `make check`). It runs the host unit test of `include/*.h`, the linters (yamllint, clang-format, clang-tidy) and `esphome config` on both variants: `heatpump.yaml`, and `heatpump-lease.tmp.yaml`, which is generated with the lease package enabled. `make compile` builds both firmware variants, and `make format` fixes C++ formatting. The [Makefile](Makefile) pins the ESPHome and linter versions. clang-tidy runs on the host test, which includes every header in `include/`; `.clang-tidy` enables bug-finding checks only.
 
-When all is connected, place the back panel of the display back and put back the front panel of the indoor unit.
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `make test`, `make lint`, and `make config` plus `make compile` per variant, using the dummy secrets in `tests/secrets.ci.yaml`.
 
-## Configuration
+## Wiring
 
-In the `models` directory you will find multiple yaml files for specific models and more generic ones. Place the content of the model file which is the best fit for your heat pump in your ESPHome device and change the `uart` and `modbus_controller` settings to your needs. The `substitutions` section can be used to change the entities name as they apear in Home Assistant. In the [homeassistant](homeassistant) directory I placed and example dashboard and some example automations.
+On the back of the wired controller (the display on the indoor unit), connect the T-CAN485 RS485 terminals: **A+ to H2**, **B- to H1**, ground to **E**. The heat pump is Modbus slave 1 at 9600 baud; every register is polled every 10 s.
 
-*If you are not able to find a good fit in the models directory for your heat pump, then try the `R32-generic.yaml`, that will probably work.*
+![Wired controller](pictures/wired_controller.png)
 
-## Single-purpose control registers (site-zwwg)
+## How writes work
 
-The zwwg model writes the day-to-day controls to the vendor single-purpose registers instead of read-modify-writing the packed ones (Midea 120L Modbus doc: "Point 0 has the same functions as points 14, 15, 16, and 17 … Point 2 … 11 and 12 … Point 6 … 18 and 19. It is recommended to use [them] for control"):
+Many Midea registers pack several settings into one 16-bit word (for example reg 5 holds ECO, silent mode, holiday and weather compensation bits). Modbus can only write a whole word. So an entity that changes one of these fields does a read-modify-write against a *shadow*, a global refreshed by each poll. `hp::write_packed` in `include/packed_register.h` does this for every packed field:
 
-| Entity | Write (FC06) | Still read from |
+- No write before the register has been read once; the initial 0 would clear every other bit.
+- Only the bits of that setting change.
+- No write when nothing changes. The heat pump probably stores these settings in non-volatile memory of unknown endurance, so needless writes are avoided.
+
+For the day-to-day controls the heat pump offers single-purpose registers that hold just one field. We write those instead with `hp::write_verified`: it refuses until that register was read once, skips unchanged values, and reads the same register back after writing. The entity itself still shows the field from the packed register:
+
+| Entity | Writes (and reads back) | Entity state from |
 | --- | --- | --- |
-| *Set Water Temperature T1S Zone 1* | reg 11 | reg 2 low byte |
-| *Power DHW T5S* | reg 15 (0/1) | reg 0 bit 2 |
-| *Water Flow Temperature Control Zone 1* | reg 16 (0/1) | reg 0 bit 1 |
-| *Weather Compensation Curve Zone 1* | reg 18 | reg 6 low byte |
+| Set Water Temperature T1S Zone 1 | reg 11 | reg 2 low byte |
+| Power DHW T5S | reg 15 | reg 0 bit 2 |
+| Water Flow Temperature Control Zone 1 | reg 16 | reg 0 bit 1 |
+| Weather Compensation Curve Zone 1 | reg 18 | reg 6 low byte |
 
-A write is refused until its register has been read once (the *… Readback (reg NN)* diagnostic sensors), is skipped when the register already holds the value, and is followed by a read-back of the same register; the read-back also updates the packed shadow so the entity is right before the next poll. *Room Temperature Control* (reg 0 bit 0), *Weather Compensation Zone 1* (reg 5 bit 12, no single-purpose register) and the other packed bits keep the PR #1 guarded read-modify-write.
+All other settings (mostly installer values) are whole registers that ESPHome writes as-is when you change the entity. [docs/registers.md](docs/registers.md) lists every register the firmware can write.
 
-## Supervised T1S lease (site-zwwg)
+## Safety limit
 
-`models/R290-airwell-wellea-m-ht-zwwg-lease.yaml` wraps the zwwg model (unchanged) and adds an on-device safety net for an external supervisor (Homage) that sets the Zone 1 supply temperature directly. Logic: `models/t1s_lease.h`. Flashing the plain zwwg model leaves behaviour unchanged.
+The zone 1 heating controls we expose are capped at **40 °C**: *Set Water Temperature T1S Zone 1* (reg 11) and the curve points T1SetH1/H2 (regs 265/266). The screed and floor covering set this limit. Don't raise it without checking them.
 
-Native API actions (callable with aioesphomeapi, no Home Assistant needed):
+This is a limit on those inputs, not an interlock. The floor-drying program (*Highest Drying Temperature*, reg 258) still allows 55 °C, and the lease restores whatever T1S the heat pump had before it took over.
 
-| Action | Effect |
-| --- | --- |
-| `set_supervised_t1s(t1s, lease_s)` | First call: fresh read of reg 5 and of reg 11, snapshot of WC-zone-1 bit (reg 5 `0x1000`) and T1S zone 1 (reg 11) persisted to flash, then WC zone 1 off (only if it was on), then T1S z1 = `t1s`. Later calls: renew the lease and set the *target*; the target is written subject to the rate limit below. |
-| `renew_lease(lease_s)` | Renew only. No Modbus traffic, no flash write. |
-| `release_supervision()` | Restore now. When the restore has halted (see below), re-arms one more retry series, at most once per hour. |
+## Supervised T1S lease (opt-in)
 
-`set_supervised_t1s` and `renew_lease` are rejected (see *Last Error*) while a release is pending (an op is still in flight before the restore) and while a restore is owed. *Last Error* is cleared after a verified takeover or a verified restore.
+`packages/t1s-lease.yaml` lets an external supervisor (Homage) set the zone 1 water target directly for a limited time. If the supervisor goes away, the ESP restores the heat pump's own settings by itself. Enable it by uncommenting its line in `heatpump.yaml`. See [docs/t1s-lease.md](docs/t1s-lease.md).
 
-- `t1s` must be within 20–40 °C (UFH cap) and within the unit's T1S heating limits (regs 203/204) when read; otherwise rejected (see *Last Error*). `lease_s` ≥ 10, capped at 7200 s. Lease timing uses wrap-safe `millis()` arithmetic.
-- T1S zone 1 is written to the single-purpose **reg 11** (whole value, FC06), not as a read-modify-write of the packed reg 2. Reg 11 mirrors reg 2's low byte (verified on this unit; the Midea 120L Modbus doc recommends regs 11/12 for control). There is no single-purpose register for the weather-compensation bit, so reg 5 bit 12 stays a masked read-modify-write.
-- Every write starts from a fresh read of that single register (the wired controller shares the bus), is skipped if the value/bits already match, and is verified by read-back of the same register after 3 s, up to 3 attempts (15 s response timeout). The stock shadow globals are only updated from real reads, never optimistically (a real reg 11 read also updates the low byte of the reg 2 shadow). Only reg 11 and reg 5 bit 12 are ever written. Registers 0/2/6/7/8/212 are never written.
-- A snapshot reg 11 outside 5–65 °C aborts the takeover before anything is written.
-- State is a single mode: `idle → takeover → supervising → restoring (→ restore_backoff → restore_halted)`, shown by *T1S Supervision Mode*.
+## Adding a register
 
-### Heat-pump EEPROM writes
+1. Find it in the V.E mapping table and pick the package by topic.
+2. Add a `modbus_controller` entity with the decimal `address`, and a one-line comment with the register number and scaling.
+3. Is it a field inside a packed register? Read it from that register's shadow global, and write it with `hp::write_packed(...)`; copy a neighbouring entity.
+4. Run the checks above.
 
-The heat pump stores reg 11 (= reg 2 low byte) and reg 5 in EEPROM. Writes per session:
+## Credits
 
-- Takeover: 1 (WC off, only if it was on) + 1 (T1S, only if different).
-- Restore: 1 (WC on, only if it was on) + 1 (T1S back, only if different).
-- So ≥4 per session when WC was on and T1S changes (2 if WC was already off), plus one per mid-lease T1S change.
-- Mid-lease T1S writes are rate limited to one per `t1s_min_write_interval_s` (substitution, default 900 s = 15 min). The latest target is always the one written; requests equal to the applied value write nothing. Worst case 4/h = 96/day ≈ 35k/year. Homage duty planning with ~1 compressor start/h needs about 2 T1S changes/h ≈ 48/day ≈ 17.5k/year, plus session writes. With a typical ~100k-cycle EEPROM rating, keep the interval ≥15 min unless the unit's real endurance is known.
-- The same interval also gates the takeover T1S write, across sessions: `release → set` or `drift → set` churn cannot bypass it. A gated takeover write is deferred (T1S stays as is) and written at the next slot while the lease runs. Restore writes are never gated but count as the last T1S write. Homage must still not churn sessions: each takeover/restore pair costs up to 2 reg 5 writes, which are not rate limited.
-- Mid-lease T1S write not verified (all read-backs timed out): both the last verified value and the target are accepted as expected until a real read decides, so a landed write is not mistaken for a user change.
-- *T1S Heat Pump Write Count* counts every reg 11/5 write made by this code since boot.
-
-ESP flash (NVS) is separate: written twice per session (snapshot on start, clear after a verified restore or an adopted external change). Renewals never write flash or Modbus.
-
-### Failure modes and retries
-
-- Snapshot read fails → supervision is not started and nothing is written.
-- Takeover write fails → whatever was applied is rolled back.
-- Mid-lease T1S write fails → the lease is kept, *Last Error* is set, and the write is retried at the next rate-limit slot.
-- Restore: WC is restored first, then T1S. The ops are independent: a failed op does not block the other. Only failed ops are retried, with exponential backoff (60 s, 120 s, … capped at 1 h). Each retry cycle *does* write again (≤3 attempts per failed op). After 8 failed cycles (~2 h) the ESP stops writing, enters `restore_halted`, keeps the snapshot pending (restored again after reboot) and sets a persistent *Last Error*. A snapshot T1S outside 5–65 °C is not written back.
-- External change during a lease (HA *Weather Compensation Zone 1* switch or T1S number, or the wired controller): each stock 10 s poll (T1S via the reg 2 low byte, WC via reg 5) is compared with the expected state (WC z1 off, T1S z1 = last verified value), after a 30 s grace period following our own I/O. On drift the ESP adopts the user's change and supervision ends; *Last Error* / *T1S External Change Count* report it:
-  - WC zone 1 switched on: everything is adopted, the snapshot is cleared, nothing is written.
-  - T1S only: the user's T1S is adopted (never written back), but WC zone 1 is still restored if it was on before the lease (we turned it off, not the user). The snapshot stays pending with "skip T1S" until that WC restore is verified.
-
-  Homage must treat this as "user took over" and not immediately call `set_supervised_t1s` again.
-- Known race (inherent): if HA or the wired controller writes T1S between our fresh read and our write (one Modbus round trip during takeover or a mid-lease write), their value is overwritten and no drift is reported.
-- DHW observation: transitions of the reg 0 DHW bit (`0x0004`, read from the stock poll, never written) within 30 s of a lease write are logged and counted in *T1S DHW Drops After Lease Write*.
-- `api.reboot_timeout` is left at the default 15 min. A reboot mid-lease simply restores. Consider `0s` once Homage is the only API client.
-
-Entities: *T1S Supervision Active*, *T1S Supervision Mode*, *T1S Lease Remaining*, *T1S Supervision Last Error*, *T1S Supervision Restore Count*, *T1S Heat Pump Write Count*, *T1S External Change Count*, *T1S DHW Drops After Lease Write*. Counters are since boot. All status entities also publish immediately on transitions.
-
-Homage pattern: call `set_supervised_t1s(target, 600)` every ~2 min (or `renew_lease(600)`). If Homage dies, the curve comes back within ≤10 min.
-
-## ESPHome Midea Heatpump Controller
-
-Together with my son [Sven](https://svenar.nl) who is an electronics student, we created an ESPHome compatible heatpump controller for the Midea heatpump (and clones). This controller can be purchased from https://shop.svenar.nl
-
-<img src="pictures/heatpump_controller_board_v3.png" width="450">
-<img src="pictures/heatpump_controller_enclosure_v3.png" width="450">
+Based on the work of Mosibi and contributors to [Midea-heat-pump-ESPHome](https://github.com/Mosibi/Midea-heat-pump-ESPHome) (Apache-2.0, see [LICENSE](LICENSE)).

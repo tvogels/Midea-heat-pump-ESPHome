@@ -1,0 +1,12 @@
+# C++ style for include/ and tests/. Google style with ESPHome's tweaks
+# (120 columns, `(T) x` casts, `template<typename T>`, includes unsorted).
+BasedOnStyle: Google
+ColumnLimit: 120
+DerivePointerAlignment: false
+PointerAlignment: Right
+SpaceAfterCStyleCast: true
+SpaceAfterTemplateKeyword: false
+BreakTemplateDeclarations: MultiLine
+SortIncludes: Never
+IncludeBlocks: Preserve
+AllowShortCaseLabelsOnASingleLine: true

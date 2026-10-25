@@ -1,6 +1,7 @@
 .vscode
-warmtepomp-debug.yaml
 secrets.yaml
-models/secrets.yaml
+warmtepomp-debug.yaml
 .venv/
-__pycache__/
+.esphome/
+heatpump-lease.tmp.yaml
+build/

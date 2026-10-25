@@ -6,7 +6,7 @@
 // renewing a lease; if it stops (crash, network loss, ESP reboot), the ESP
 // restores the original settings by itself.
 //
-// Register contract (Modbus holding registers, see README):
+// Register contract (Modbus holding registers, see docs/t1s-lease.md):
 //   reg 11 T1S zone 1, single-purpose register (whole value)    -> mask 0xFFFF
 //   reg 5  options, bit 0x1000 = weather compensation zone 1    -> mask 0x1000
 // Nothing else is ever written. Registers 0/2/6/7/8/212 are never written.
@@ -59,29 +59,29 @@ using esphome::modbus_controller::ModbusRegisterType;
 
 static const char *const TAG = "t1s_lease";
 
-static const uint16_t REG_T1S = 11;         // single-purpose T1S zone 1 (mirrors reg 2 low byte)
+static const uint16_t REG_T1S = 11;  // single-purpose T1S zone 1 (mirrors reg 2 low byte)
 static const uint16_t REG_OPTIONS = 5;
-static const uint16_t MASK_T1S_Z1 = 0xFFFF;  // reg 11 holds T1S z1 only: write the whole value
-static const uint16_t MASK_REG2_Z1 = 0x00FF; // reg 2 low byte (observed via the stock poll shadow)
+static const uint16_t MASK_T1S_Z1 = 0xFFFF;   // reg 11 holds T1S z1 only: write the whole value
+static const uint16_t MASK_REG2_Z1 = 0x00FF;  // reg 2 low byte (observed via the stock poll shadow)
 static const uint16_t MASK_WC_Z1 = 0x1000;
 static const uint16_t MASK_REG0_DHW = 0x0004;  // observed only, never written
 
-static const int T1S_MIN = 20;               // site floor for supervised heating targets
-static const int T1S_MAX = 40;               // UFH screed cap (matches the zwwg number max_value)
-static const uint8_t SNAP_T1S_MIN = 5;       // plausible range of a snapshot T1S value
+static const int T1S_MIN = 20;          // site floor for supervised heating targets
+static const int T1S_MAX = 40;          // UFH screed cap (matches the zwwg number max_value)
+static const uint8_t SNAP_T1S_MIN = 5;  // plausible range of a snapshot T1S value
 static const uint8_t SNAP_T1S_MAX = 65;
 static const uint32_t LEASE_MIN_S = 10;
 static const uint32_t LEASE_MAX_S = 2 * 3600;  // hard cap: 2 h
 static const uint32_t RESPONSE_TIMEOUT_MS = 15000;
-static const uint32_t VERIFY_DELAY_MS = 3000;   // let the unit apply the write before reading back
-static const uint8_t MAX_ATTEMPTS = 3;          // per register operation and cycle
+static const uint32_t VERIFY_DELAY_MS = 3000;  // let the unit apply the write before reading back
+static const uint8_t MAX_ATTEMPTS = 3;         // per register operation and cycle
 static const uint32_t RESTORE_BACKOFF_MIN_MS = 60000;
 static const uint32_t RESTORE_BACKOFF_MAX_MS = 3600000;
-static const uint8_t MAX_RESTORE_CYCLES = 8;    // 1+2+4+...+60 min ≈ 2.1 h of retries, then stop writing
+static const uint8_t MAX_RESTORE_CYCLES = 8;  // 1+2+4+...+60 min ≈ 2.1 h of retries, then stop writing
 static const uint32_t BOOT_RESTORE_DELAY_MS = 30000;
-static const uint32_t DRIFT_GRACE_MS = 30000;   // > stock poll interval (10 s) after our last I/O
+static const uint32_t DRIFT_GRACE_MS = 30000;  // > stock poll interval (10 s) after our last I/O
 static const uint32_t DHW_WATCH_MS = 30000;
-static const uint32_t REARM_MIN_MS = 3600000;   // release() may re-arm a halted restore once per hour
+static const uint32_t REARM_MIN_MS = 3600000;  // release() may re-arm a halted restore once per hour
 static const uint32_t SNAPSHOT_MAGIC = 0x7153A001;
 static const uint8_t SNAP_FLAG_SKIP_T1S = 0x01;  // user adopted a T1S during the lease: restore WC only
 
@@ -93,15 +93,15 @@ struct Snapshot {
   uint8_t wc_z1_was_on;
   uint8_t t1s_z1;
   uint8_t pending;  // 1 = a restore is owed
-  uint8_t flags;  // SNAP_FLAG_*
+  uint8_t flags;    // SNAP_FLAG_*
 };
 
 // One masked read-modify-write with read-back verification.
 struct Op {
   uint16_t reg;
   uint16_t mask;
-  uint16_t bits;        // desired value of the masked bits
-  bool follow_target;   // T1S op whose bits track the latest target_
+  uint16_t bits;       // desired value of the masked bits
+  bool follow_target;  // T1S op whose bits track the latest target_
 };
 
 // Single lifecycle state (replaces the former active_/want_restore_/restoring_ flags).
@@ -151,8 +151,12 @@ class T1sLease {
                     std::to_string(T1S_MAX) + ")");
     }
     // Unit's own T1S heating limits (regs 203/204), when they have been read.
-    if (!std::isnan(unit_min) && unit_min > 0 && t1s < unit_min) return error_("rejected t1s below unit lower limit");
-    if (!std::isnan(unit_max) && unit_max > 0 && t1s > unit_max) return error_("rejected t1s above unit upper limit");
+    if (!std::isnan(unit_min) && unit_min > 0 && (float) t1s < unit_min) {
+      return error_("rejected t1s below unit lower limit");
+    }
+    if (!std::isnan(unit_max) && unit_max > 0 && (float) t1s > unit_max) {
+      return error_("rejected t1s above unit upper limit");
+    }
     if (lease_s < (int) LEASE_MIN_S) return error_("rejected lease_s < 10");
     if (restore_owed_()) return error_("rejected: restore pending");
     if (release_pending_) return error_("rejected: release pending");
@@ -222,8 +226,7 @@ class T1sLease {
           read_(Io::VERIFY_READ, ops_.front().reg, 1);
         }
         break;
-      case Io::NONE:
-        break;
+      case Io::NONE: break;
     }
 
     if (mode_ == Mode::SUPERVISING && io_ == Io::NONE && ops_.empty()) {
@@ -411,8 +414,7 @@ class T1sLease {
           }
         }
         break;
-      default:
-        break;
+      default: break;
     }
   }
 
@@ -551,8 +553,7 @@ class T1sLease {
           t1s_alt_ = (uint8_t) (op.bits & 0x00FF);
           t1s_alt_valid_ = true;
           break;
-        default:
-          break;
+        default: break;
       }
     }
     next_op_();
@@ -647,7 +648,7 @@ class T1sLease {
   uint16_t *shadow_reg5_{nullptr};
   bool *shadow_reg2_valid_{nullptr};
   bool *shadow_reg5_valid_{nullptr};
-  uint8_t snap_step_{0};    // 0 = reading reg 5, 1 = reading reg 11
+  uint8_t snap_step_{0};  // 0 = reading reg 5, 1 = reading reg 11
   uint16_t snap_v5_{0};
   esphome::ESPPreferenceObject pref_;
   Snapshot snap_{};
@@ -657,7 +658,7 @@ class T1sLease {
   bool release_pending_{false};
   uint8_t target_{0};
   uint8_t applied_t1s_{0};
-  uint8_t t1s_alt_{0};          // possibly-applied target after an unverified write
+  uint8_t t1s_alt_{0};  // possibly-applied target after an unverified write
   bool t1s_alt_valid_{false};
   bool rearmed_{false};
   uint32_t last_rearm_ms_{0};

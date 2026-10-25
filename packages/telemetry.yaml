@@ -1,0 +1,462 @@
+# Temperatures, compressor, fan, pressures, flow and derived running state (regs 100-142, 191-192, 703).
+
+globals:
+  - id: compressor_start_count
+    type: int
+    restore_value: false
+    initial_value: '0'
+
+sensor:
+  # Counted by the 2 s interval below, reset every hour.
+  - platform: template
+    name: "Compressor Starts Per Hour"
+    id: compressor_starts_per_hour
+    unit_of_measurement: "starts/h"
+    accuracy_decimals: 0
+    update_interval: 10s
+    lambda: |-
+      return id(compressor_start_count);
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Compressor Operating Frequency"
+    id: "heatpump_compressor_operating_frequency"
+    icon: mdi:sine-wave
+    register_type: holding
+    address: 100
+    value_type: U_WORD
+    unit_of_measurement: Hz
+    device_class: "frequency"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Fan Speed"
+    id: "heatpump_fan_speed"
+    icon: mdi:fan
+    register_type: holding
+    address: 102
+    unit_of_measurement: "r/min"
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "PMV Openness"
+    id: "heatpump_pmv_openness"
+    icon: mdi:valve
+    register_type: holding
+    address: 103
+    value_type: U_WORD
+    unit_of_measurement: "%"
+    filters:
+      - calibrate_linear:
+          - 0 -> 0.0
+          - 480 -> 100.0
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Water Inlet Temperature"
+    id: "heatpump_water_inlet_temperature"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 104
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Water Outlet Temperature"
+    id: "heatpump_water_outlet_temperature"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 105
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Condenser Temperature T3"
+    id: "heatpump_condenser_temperature_t3"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 106
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Outdoor Ambient Temperature"
+    id: "heatpump_outdoor_ambient_temperature"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 107
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    value_type: S_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Discharge Temperature"
+    id: "heatpump_discharge_temperature"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 108
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+
+  - id: "heatpump_compressor_suction_temperature_th"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Compressor Suction Temperature Th"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 109
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Total Water Outlet Temperature T1"
+    id: "heatpump_total_water_outlet_temperature_t1"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 110
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Refrigerant Liquid Side Temperature T2"
+    id: "heatpump_refrigerant_liquid_side_temperature_t2"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 112
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Refrigerant Gas Side Temperature T2B"
+    id: "heatpump_refrigerant_gas_side_temperature_t2b"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 113
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Room Temperature Ta"
+    id: "heatpump_room_temperature_ta"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 114
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Water Tank Temperature T5"
+    id: "heatpump_water_tank_temperature_t5"
+    icon: mdi:thermometer-water
+    register_type: holding
+    address: 115
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    value_type: S_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Outdoor Unit High Pressure"
+    id: "heatpump_outdoor_unit_high_pressure"
+    icon: mdi:car-brake-worn-linings
+    register_type: holding
+    address: 116
+    value_type: U_WORD
+    unit_of_measurement: kPa
+    device_class: "pressure"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Outdoor Unit Low Pressure"
+    id: "heatpump_outdoor_unit_low_pressure"
+    icon: mdi:car-brake-low-pressure
+    register_type: holding
+    address: 117
+    value_type: U_WORD
+    unit_of_measurement: kPa
+    device_class: "pressure"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Outdoor Unit Current"
+    id: "heatpump_outdoor_unit_current"
+    icon: mdi:alpha-a
+    register_type: holding
+    address: 118
+    value_type: U_WORD
+    unit_of_measurement: A
+    device_class: "current"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Outdoor Unit Voltage"
+    id: "heatpump_outdoor_unit_voltage"
+    icon: mdi:alpha-v
+    register_type: holding
+    address: 119
+    value_type: U_WORD
+    unit_of_measurement: V
+    device_class: "voltage"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Compressor Operation Time"
+    id: "heatpump_compressor_operation_time"
+    icon: mdi:av-timer
+    register_type: holding
+    address: 122
+    value_type: U_WORD
+    unit_of_measurement: hr
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Unit Capacity"
+    id: "heatpump_unit_capacity"
+    icon: mdi:lightning-bolt-circle
+    register_type: holding
+    address: 123
+    value_type: U_WORD
+    unit_of_measurement: "kW"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Compressor Target Frequency"
+    id: "heatpump_compressor_target_frequency"
+    icon: mdi:sine-wave
+    register_type: holding
+    address: 132
+    value_type: U_WORD
+    unit_of_measurement: Hz
+    device_class: "frequency"
+    state_class: "measurement"
+
+  - id: "heatpump_inverter_dc_bus_current"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Inverter DC Bus Current"
+    icon: mdi:alpha-a
+    register_type: holding
+    address: 133
+    value_type: U_WORD
+    unit_of_measurement: A
+    device_class: "current"
+    state_class: "measurement"
+    filters:
+      - multiply: 0.1
+    accuracy_decimals: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "DC Bus Voltage"
+    id: "heatpump_dc_bus_voltage"
+    icon: mdi:alpha-v
+    register_type: holding
+    address: 134
+    value_type: U_WORD
+    unit_of_measurement: V
+    device_class: "voltage"
+    state_class: "measurement"
+    filters:
+      - multiply: 10
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "TF module temperature"
+    id: "heatpump_tf_module_temperature"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 135
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    value_type: S_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Climate Curve T1S Calculated Value 1"
+    id: "heatpump_climate_curve_t1s_calculated_value_1"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 136
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Water Flow"
+    id: "heatpump_water_flow"
+    icon: mdi:waves-arrow-right
+    register_type: holding
+    address: 138
+    value_type: U_WORD
+    unit_of_measurement: m3/H
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  - id: "heatpump_odu_current_limitation_code"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "ODU Current Limitation Code"
+    icon: mdi:eye
+    register_type: holding
+    address: 139
+    value_type: U_WORD
+
+  - id: "heatpump_hydraulic_module_capacity"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Hydraulic Module Capacity"
+    icon: mdi:lightning-bolt
+    register_type: holding
+    address: 140
+    value_type: S_WORD
+    unit_of_measurement: kW
+    accuracy_decimals: 2
+    filters:
+      - lambda: return x * 0.01;
+
+  # T1S for DHW = T5 + dT1S5.
+  - platform: template
+    name: "T1S DHW"
+    id: "heatpump_t1s_dhw"
+    icon: mdi:thermometer
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    lambda: |-
+      int dt1s5 = id(heatpump_dt1s5).state;
+      int t5 = id(heatpump_water_tank_temperature_t5).state;
+      int t1s_dhw = t5 + dt1s5;
+      return t1s_dhw;
+
+  # Outlet - inlet water temperature.
+  - platform: template
+    name: "Water Temperature Delta"
+    id: "heatpump_water_temperature_delta"
+    icon: mdi:thermometer
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    state_class: "measurement"
+    lambda: |-
+      int inlet = id(heatpump_water_inlet_temperature).state;
+      int outlet = id(heatpump_water_outlet_temperature).state;
+      int delta = outlet - inlet;
+      return delta;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "TL Outdoor Refrigerant Pipe Temperature"
+    id: "heatpump_tl_outdoor_refrigerant_pipe_temperature"
+    icon: mdi:thermometer
+    register_type: holding
+    address: 191
+    value_type: S_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 0
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Pump Internal PWM"
+    id: "heatpump_pump_internal_pwm"
+    icon: mdi:pump
+    register_type: holding
+    address: 192
+    value_type: U_WORD
+    unit_of_measurement: "%"
+    accuracy_decimals: 1
+    filters:
+      - lambda: return x * 0.1;
+
+  # Reg 703: R290 leak sensor (% LFL x10) on the optional expansion board.
+  # 0x7FFF = board absent; the filter drops it.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "R290 Refrigerant Concentration"
+    id: "heatpump_r290_refrigerant_concentration"
+    icon: mdi:gas-cylinder
+    register_type: holding
+    address: 703
+    value_type: U_WORD
+    unit_of_measurement: "%LFL"
+    accuracy_decimals: 1
+    filters:
+      - lambda: |-
+          if (x == 0x7FFF) return {};   // expansion board absent
+          return x * 0.1f;              // protocol value = actual % LFL ×10
+
+binary_sensor:
+  - platform: template
+    name: "Compressor Running"
+    id: compressor_running
+    device_class: running
+    lambda: |-
+      return id(heatpump_compressor_operating_frequency).state > 0;
+
+  # Outdoor unit running: fan, compressor or internal circulation pump Pump_I
+  # (reg 129 bit 3; this install has no external pump Pump_O).
+  - platform: template
+    name: "Heat pump running"
+    id: "heatpump_heat_pump_running"
+    icon: mdi:power
+    lambda: |-
+      int fan_speed = id(heatpump_fan_speed).state;
+      int compressor_frequency = id(heatpump_compressor_operating_frequency).state;
+      bool internal_water_pump_on = id(heatpump_load_output_internal_circulation_pump_pump_i).state;
+      return fan_speed > 0 || compressor_frequency > 0 || internal_water_pump_on;
+
+interval:
+  - interval: 1h
+    then:
+      - lambda: |-
+          id(compressor_start_count) = 0;
+
+  - interval: 2s
+    then:
+      - lambda: |-
+          static bool was_running = false;
+          bool is_running = id(compressor_running).state;
+
+          if (!was_running && is_running) {
+            id(compressor_start_count) += 1;
+          }
+
+          was_running = is_running;
