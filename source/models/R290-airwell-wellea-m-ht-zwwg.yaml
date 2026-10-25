@@ -94,8 +94,8 @@ remove:
     - id: "${devicename}_temperature_upper_limit_of_t1s_heating_zone_2"
     - id: "${devicename}_temperature_lower_limit_of_t1s_heating_zone_2"
     # Buffer-tank temps Tbt1 / Tbt2 (regs 120/121) — no buffer tank
-    - id: "${devicename}_tbt1"
-    - id: "${devicename}_tbt2"
+    - id: "${devicename}_buffer_tank_temperature_top_tbt1"
+    - id: "${devicename}_buffer_tank_temperature_bottom_tbt2"
     # Second-PHE temps and valves — single-PHE install (return 0x7FFF)
     - id: "${devicename}_t9i_second_phe_inlet_temperature"
     - id: "${devicename}_t9o_second_phe_outlet_temperature"
