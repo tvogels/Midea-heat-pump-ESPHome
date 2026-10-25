@@ -485,17 +485,6 @@ sensor:
     state_class: "measurement"
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "System Total Water Outlet Temperature T1B"
-    id: "${devicename}_system_total_water_outlet_temperature_t1b"
-    icon: mdi:temperature-celsius
-    register_type: holding
-    address: 0x6f
-    value_type: S_WORD
-    unit_of_measurement: "°C"
-    device_class: "temperature"
-    state_class: "measurement"
-  - platform: modbus_controller
-    modbus_controller_id: "${devicename}"
     name: "Refrigerant Liquid Side Temperature T2"
     id: "${devicename}_refrigerant_liquid_side_temperature_t2"
     icon: mdi:temperature-celsius
@@ -785,18 +774,6 @@ sensor:
     bitmask: 0x00FF
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Temperature Upper Limit Of T1S Cooling Zone 2"
-    id: "${devicename}_temperature_upper_limit_of_t1s_cooling_zone_2"
-    icon: mdi:temperature-celsius
-    register_type: holding
-    address: 0xc9
-    value_type: S_WORD
-    unit_of_measurement: "°C"
-    device_class: "temperature"
-    state_class: "measurement"
-    bitmask: 0xFF00
-  - platform: modbus_controller
-    modbus_controller_id: "${devicename}"
     name: "Temperature Lower Limit Of T1S Cooling Zone 1"
     id: "${devicename}_temperature_lower_limit_of_t1s_cooling_zone_1"
     icon: mdi:temperature-celsius
@@ -807,18 +784,6 @@ sensor:
     device_class: "temperature"
     state_class: "measurement"
     bitmask: 0x00FF
-  - platform: modbus_controller
-    modbus_controller_id: "${devicename}"
-    name: "Temperature Lower Limit Of T1S Cooling Zone 2"
-    id: "${devicename}_temperature_lower_limit_of_t1s_cooling_zone_2"
-    icon: mdi:temperature-celsius
-    register_type: holding
-    address: 0xca
-    value_type: S_WORD
-    unit_of_measurement: "°C"
-    device_class: "temperature"
-    state_class: "measurement"
-    bitmask: 0xFF00
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "Temperature Upper Limit Of T1S Heating Zone 1"
@@ -1579,30 +1544,6 @@ binary_sensor:
     bitmask: 0x20
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Load Output External Circulation Pump PUMP_O"
-    id: "${devicename}_load_output_external_circulation_pump_pump_o"
-    icon: mdi:pump
-    register_type: holding
-    address: 0x81
-    bitmask: 0x40
-  - platform: modbus_controller
-    modbus_controller_id: "${devicename}"
-    name: "Load Output Water Return Water Pump PUMP_D"
-    id: "${devicename}_load_output_water_return_water_pump_d"
-    icon: mdi:pump
-    register_type: holding
-    address: 0x81
-    bitmask: 0x80
-  - platform: modbus_controller
-    modbus_controller_id: "${devicename}"
-    name: "Load Output Mixed Water Pump PUMP_C"
-    id: "${devicename}_load_output_mixed_water_pump_pump_c"
-    icon: mdi:pump
-    register_type: holding
-    address: 0x81
-    bitmask: 0x100
-  - platform: modbus_controller
-    modbus_controller_id: "${devicename}"
     name: "Load Output HEAT 4"
     id: "${devicename}_load_output_heat4"
     icon: mdi:eye
@@ -1652,15 +1593,8 @@ binary_sensor:
     lambda: |-
       int fan_speed = id(${devicename}_fan_speed).state;
       int compressor_frequency = id(${devicename}_compressor_operating_frequency).state;
-      bool external_water_pump_on = id(${devicename}_load_output_external_circulation_pump_pump_o).state;
-
-      // If fan_speed is above 0, compressor_frequency is above 0 or external_water_pump_on is true,
-      // then the outside unit of the heat pump system is running
-      if (fan_speed > 0 || compressor_frequency > 0 || external_water_pump_on) {
-          return true;
-      } else {
-          return false;
-      }
+      bool internal_water_pump_on = id(${devicename}_load_output_internal_circulation_pump_pump_i).state;
+      return fan_speed > 0 || compressor_frequency > 0 || internal_water_pump_on;
 
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
@@ -2049,45 +1983,6 @@ switch:
             ${devicename}->queue_command(set_payload_command);
           }
   - platform: template
-    name: "Function Setting DHW Pumps Running Constant Temperature Water Recycling"
-    id: "${devicename}_function_setting_dhw_pumps_running_constant_temperature_water_recycling"
-    icon: mdi:eye
-    entity_category: config
-    restore_mode: DISABLED
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_5) & 0x800) == 0x800;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x800;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
-          new_value &= ~checked_bit;                           // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to on f_s_dhw_pumps_running_constant_temperature_water_recycling 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 5, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x800;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
-          new_value &= ~checked_bit;                           // Clear and set
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to off f_s_dhw_pumps_running_constant_temperature_water_recycling 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 5, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
     name: "Weather Compensation Zone 1"
     id: "${devicename}_weather_compensation_zone_1"
     icon: mdi:eye
@@ -2462,84 +2357,6 @@ switch:
             ${devicename}->queue_command(set_payload_command);
           }
   - platform: template
-    name: "Parameter Setting 1 DHW Pump Supports Pipe Disinfect"
-    id: "${devicename}_parameter_setting_1_dhw_pump_supports_pipe_disinfect"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_210) & 0x400) == 0x400;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x400;
-          if (!id(unmasked_value_register_210_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_210)) {
-            // ESP_LOGI("unmasked_value_register_210", "Set option to on p_s_1_dhw_pump_supports_pipe_disinfect 0x%x -> 0x%x", id(unmasked_value_register_210), new_value);
-            id(unmasked_value_register_210) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 210, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x400;
-          if (!id(unmasked_value_register_210_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_210)) {
-            // ESP_LOGI("unmasked_value_register_210", "Set option to off p_s_1_dhw_pump_supports_pipe_disinfect 0x%x -> 0x%x", id(unmasked_value_register_210), new_value);
-            id(unmasked_value_register_210) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 210, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
-    name: "Parameter Setting 1 DHW Pump Supported"
-    id: "${devicename}_parameter_setting_1_dhw_pump_supported"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_210) & 0x1000) == 0x1000;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x1000;
-          if (!id(unmasked_value_register_210_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_210)) {
-            // ESP_LOGI("unmasked_value_register_210", "Set option to on p_s_1_dhw_pump_supported 0x%x -> 0x%x", id(unmasked_value_register_210), new_value);
-            id(unmasked_value_register_210) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 210, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x1000;
-          if (!id(unmasked_value_register_210_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_210)) {
-            // ESP_LOGI("unmasked_value_register_210", "Set option to off p_s_1_dhw_pump_supported 0x%x -> 0x%x", id(unmasked_value_register_210), new_value);
-            id(unmasked_value_register_210) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 210, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
     name: "Parameter Setting 1 Supports Disinfection"
     id: "${devicename}_parameter_setting_1_supports_disinfection"
     icon: mdi:eye
@@ -2619,84 +2436,6 @@ switch:
           }
 
   - platform: template
-    name: "Parameter Setting 2 IBH AHS Installation Position"
-    id: "${devicename}_parameter_setting_2_ibh_ahs_installation_position"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_211) & 0x1) == 0x1;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x1;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGI("unmasked_value_register_211", "Set option to on p_s_2_ibh_ahs_installation_position 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x1;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGI("unmasked_value_register_211", "Set option to off p_s_2_ibh_ahs_installation_position 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
-    name: "Parameter Setting 2 Tbt Sensor Enable"
-    id: "${devicename}_parameter_setting_2_tbt_sensor_enable"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_211) & 0x2) == 0x2;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x2;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGI("unmasked_value_register_211", "Set option to on p_s_2_tbt_sensor_enable 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x2;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGI("unmasked_value_register_211", "Set option to off p_s_2_tbt_sensor_enable 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
     name: "Parameter Setting 2 Ta Sensor Position"
     id: "${devicename}_parameter_setting_2_ta_sensor_position"
     icon: mdi:eye
@@ -2731,158 +2470,6 @@ switch:
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
             // ESP_LOGI("unmasked_value_register_211", "Set option to off p_s_2_ta_sensor_position 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
-    name: "Parameter Setting 2 Double Zone Setting Is Valid"
-    id: "${devicename}_parameter_setting_2_double_zone_setting_is_valid"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_211) & 0x8) == 0x8;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x8;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGI("unmasked_value_register_211", "Set option to on p_s_2_ibh_ahs_installation_position 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x8;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGD("unmasked_value_register_211", "Set option to off p_s_2_ibh_ahs_installation_position 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
-    name: "Parameter Setting 2 Setting The High Low Temperature Of Heating Mode T1S"
-    id: "${devicename}_parameter_setting_2_setting_the_high_low_temperature_of_heating_mode_t1s"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_211) & 0x10) == 0x10;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x10;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGD("unmasked_value_register_211", "Set option to on p_s_2_setting_the_high_low_temperature_of_heating_mode_t1s 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x10;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGD("unmasked_value_register_211", "Set option to off p_s_2_setting_the_high_low_temperature_of_heating_mode_t1s 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
-    name: "Parameter Setting 2 Setting The High Low Temperature Of Cooling Mode T1S"
-    id: "${devicename}_parameter_setting_2_setting_the_high_low_temperature_of_cooling_mode_t1s"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_211) & 0x20) == 0x20;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x20;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_211)) {
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x20;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_211)) {
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
-    name: "Parameter Setting 2 Tw2 Enabled"
-    id: "${devicename}_parameter_setting_2_tw2_enabled"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_211) & 0x40) == 0x40;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x40;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_211)) {
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x40;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_211)) {
             id(unmasked_value_register_211) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
             ${devicename}->queue_command(set_payload_command);
@@ -2962,84 +2549,6 @@ switch:
             ${devicename}->queue_command(set_payload_command);
           }
   - platform: template
-    name: "Parameter Setting 2 Solar Energy Kit Enable"
-    id: "${devicename}_parameter_setting_2_solar_energy_kit_enable"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_211) & 0x200) == 0x200;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x200;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGD("unmasked_value_register_211", "Set option to on p_s_2_solar_energy_kit_enable 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x200;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGD("unmasked_value_register_211", "Set option to off p_s_2_solar_energy_kit_enable 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
-    name: "Parameter Setting 2 Solar Energy Input Port"
-    id: "${devicename}_parameter_setting_2_solar_energy_input_port"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_211) & 0x400) == 0x400;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x400;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGD("unmasked_value_register_211", "Set option to on p_s_2_smart_grid 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x400;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGD("unmasked_value_register_211", "Set option to off p_s_2_smart_grid 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
     name: "Parameter Setting 2 Piping Length Selection"
     id: "${devicename}_parameter_setting_2_piping_length_selection"
     icon: mdi:eye
@@ -3074,45 +2583,6 @@ switch:
           new_value &= ~checked_bit;                             // Clear and set
           if ((new_value) != id(unmasked_value_register_211)) {
             // ESP_LOGD("unmasked_value_register_211", "Set option to off p_s_2_piping_length_selection 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
-    name: "Parameter Setting 2 Tbt2 Sensor Is Valid"
-    id: "${devicename}_parameter_setting_2_tbt2_sensor_is_valid"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_211) & 0x1000) == 0x1000;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x1000;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGD("unmasked_value_register_211", "Set option to on p_s_2_tbt2_sensor_is_valid 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x1000;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGD("unmasked_value_register_211", "Set option to off p_s_2_tbt2_sensor_is_valid 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
             id(unmasked_value_register_211) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
             ${devicename}->queue_command(set_payload_command);
@@ -3156,46 +2626,6 @@ switch:
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
             ${devicename}->queue_command(set_payload_command);
           }
-  - platform: template
-    name: "Parameter Setting 2 M1M2 Is Used For AHS Control"
-    id: "${devicename}_parameter_setting_2_m1m2_is_used_for_ahs_control"
-    icon: mdi:eye
-    restore_mode: DISABLED
-    entity_category: config
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_211) & 0x4000) == 0x4000;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x4000;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGD("unmasked_value_register_211", "Set option to on p_s_2_m1m2_is_used_for_ahs_control 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x4000;
-          if (!id(unmasked_value_register_211_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
-          new_value &= ~checked_bit;                             // Clear and set
-          if ((new_value) != id(unmasked_value_register_211)) {
-            // ESP_LOGD("unmasked_value_register_211", "Set option to off p_s_2_m1m2_is_used_for_ahs_control 0x%x -> 0x%x", id(unmasked_value_register_211), new_value);
-            id(unmasked_value_register_211) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-
   - platform: template
     name: "EnSwitchPDC"
     id: "${devicename}_enswitchpdc"
@@ -3370,18 +2800,6 @@ number:
       id(unmasked_curve_selection) = value;  // Optimistic shadow update so a second write before the next poll keeps this change
 
       return {};
-  - platform: modbus_controller
-    modbus_controller_id: "${devicename}"
-    name: "DHW Pump Return Running Time"
-    id: "${devicename}_dhw_pump_return_running_time"
-    icon: mdi:clock-check-outline
-    register_type: holding
-    address: 0xd1
-    value_type: U_WORD
-    unit_of_measurement: min
-    entity_category: config
-    min_value: 5
-    max_value: 120
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "dT5_On"

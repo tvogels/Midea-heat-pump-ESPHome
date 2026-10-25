@@ -35,6 +35,8 @@ parent: R290-airwell-wellea-m-ht.yaml
 # -----------------------------------------------------------------------------
 remove:
   number:
+    # --- NL scope (PR #4 follow-up): no DHW recirculation (Pump_D)
+    - id: "${devicename}_dhw_pump_return_running_time"
     # --- prune (data-backed, see PR): no IBH/TBH/AHS, no solar, no SG/EVU, no zone 2, no slaves, reserved bits
     - id: "${devicename}_t_tbh_delay"
     - id: "${devicename}_dt5_tbh_off"
@@ -81,6 +83,10 @@ remove:
     # Solar function mode — no solar thermal
     - id: "${devicename}_solar_function_mode"
   sensor:
+    # --- NL scope (PR #4 follow-up): reg 111 is zone-2 Tw2 (fork label "T1B"; constant 25 = unavailable); zone-2 cooling limits
+    - id: "${devicename}_system_total_water_outlet_temperature_t1b"
+    - id: "${devicename}_temperature_upper_limit_of_t1s_cooling_zone_2"
+    - id: "${devicename}_temperature_lower_limit_of_t1s_cooling_zone_2"
     # --- prune (data-backed, see PR): no IBH/TBH/AHS, no solar, no SG/EVU, no zone 2, no slaves, reserved bits
     - id: "${devicename}_forced_hydraulic_module_rear_electric_heater_1"
     - id: "${devicename}_tsolar"
@@ -99,6 +105,11 @@ remove:
     - id: "${devicename}_fan2_speed"
 
   binary_sensor:
+    # --- NL scope (PR #4 follow-up): no external circulation pump (Pump_O); only internal Pump_I
+    - id: "${devicename}_load_output_external_circulation_pump_pump_o"
+    # --- NL scope (PR #4 follow-up): no zone-2 mixing (Pump_C), no DHW recirculation (Pump_D)
+    - id: "${devicename}_load_output_mixed_water_pump_pump_c"
+    - id: "${devicename}_load_output_water_return_water_pump_d"
     # --- prune (data-backed, see PR): no IBH/TBH/AHS, no solar, no SG/EVU, no zone 2, no slaves, reserved bits
     - id: "${devicename}_slave_unit_online_status_reserved_bit_0"
     - id: "${devicename}_slave_unit_1_online_status"
@@ -159,6 +170,20 @@ remove:
     - id: "${devicename}_parameter_setting_1_supports_water_tank_electric_heater_tbh"
 
   switch:
+    # --- NL scope (PR #4 follow-up): zone 2 (incl. reg 211 b4/b5 zone-2 high/low temp), DHW recirculation, solar kit, buffer sensors, backup-heater placement
+    - id: "${devicename}_parameter_setting_2_double_zone_setting_is_valid"
+    - id: "${devicename}_parameter_setting_2_tw2_enabled"
+    - id: "${devicename}_parameter_setting_2_setting_the_high_low_temperature_of_heating_mode_t1s"
+    - id: "${devicename}_parameter_setting_2_setting_the_high_low_temperature_of_cooling_mode_t1s"
+    - id: "${devicename}_function_setting_dhw_pumps_running_constant_temperature_water_recycling"
+    - id: "${devicename}_parameter_setting_1_dhw_pump_supported"
+    - id: "${devicename}_parameter_setting_1_dhw_pump_supports_pipe_disinfect"
+    - id: "${devicename}_parameter_setting_2_solar_energy_kit_enable"
+    - id: "${devicename}_parameter_setting_2_solar_energy_input_port"
+    - id: "${devicename}_parameter_setting_2_tbt_sensor_enable"
+    - id: "${devicename}_parameter_setting_2_tbt2_sensor_is_valid"
+    - id: "${devicename}_parameter_setting_2_ibh_ahs_installation_position"
+    - id: "${devicename}_parameter_setting_2_m1m2_is_used_for_ahs_control"
     # --- prune (data-backed, see PR): no IBH/TBH/AHS, no solar, no SG/EVU, no zone 2, no slaves, reserved bits
     - id: "${devicename}_forced_tbh"
     - id: "${devicename}_water_flow_temperature_control_zone_2"
@@ -176,6 +201,14 @@ remove:
 # -----------------------------------------------------------------------------
 modify:
   binary_sensor:
+    # Pump_O is removed (not installed); base "Heat pump running" lambda read it.
+    # Use the internal circulation pump Pump_I (reg 129 BIT3) instead.
+    - id: "${devicename}_heat_pump_running"
+      lambda: |-
+        int fan_speed = id(${devicename}_fan_speed).state;
+        int compressor_frequency = id(${devicename}_compressor_operating_frequency).state;
+        bool internal_water_pump_on = id(${devicename}_load_output_internal_circulation_pump_pump_i).state;
+        return fan_speed > 0 || compressor_frequency > 0 || internal_water_pump_on;
     # Reg 128 BIT6/BIT7 per Modbus doc are the room-thermostat HT/CL on/off
     # inputs (base labels them "Master Mode Mirror Heat/Cool"). Same ids kept.
     - id: "${devicename}_status_bit_1_master_mode_heat"
