@@ -1434,6 +1434,48 @@ sensor:
       - lambda: |-
           if (x == 0x7FFF) return {};   // expansion board absent
           return x * 0.1f;              // protocol value = actual % LFL ×10
+  - platform: modbus_controller
+    modbus_controller_id: "${devicename}"
+    name: "T1S Zone 1 (reg 11)"
+    id: "${devicename}_reg11_t1s_zone_1"
+    register_type: holding
+    address: 0x0B         # reg 11
+    value_type: U_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 0
+    force_new_range: true
+    entity_category: diagnostic
+  - platform: modbus_controller
+    modbus_controller_id: "${devicename}"
+    name: "Power DHW (reg 15)"
+    id: "${devicename}_reg15_power_dhw"
+    register_type: holding
+    address: 0x0F         # reg 15
+    value_type: U_WORD
+    accuracy_decimals: 0
+    force_new_range: true
+    entity_category: diagnostic
+  - platform: modbus_controller
+    modbus_controller_id: "${devicename}"
+    name: "Power Zone 1 (reg 16)"
+    id: "${devicename}_reg16_power_zone_1"
+    register_type: holding
+    address: 0x10         # reg 16
+    value_type: U_WORD
+    accuracy_decimals: 0
+    force_new_range: true
+    entity_category: diagnostic
+  - platform: modbus_controller
+    modbus_controller_id: "${devicename}"
+    name: "Curve Selection Zone 1 (reg 18)"
+    id: "${devicename}_reg18_curve_selection_zone_1"
+    register_type: holding
+    address: 0x12         # reg 18
+    value_type: U_WORD
+    accuracy_decimals: 0
+    force_new_range: true
+    entity_category: diagnostic
 binary_sensor:
   - platform: template
     name: "Compressor Running"
