@@ -417,6 +417,8 @@ text_sensor:
       uint16_t raw = (uint16_t(data[item->offset]) << 8) | data[item->offset + 1];
       return hp::operating_mode(raw);
 
+  # Reg 199: on this unit it read 0 (Off) while reg 101 said Heating and the
+  # compressor ran at 41 Hz (2026-10-25). Use Operating Mode and the compressor frequency instead.
   - platform: modbus_controller
     modbus_controller_id: "heatpump"
     name: "Heat Pump Operation Mode"
@@ -444,7 +446,8 @@ text_sensor:
     address: 190
     lambda: return hp::hydraulic_submodel(modbus_controller::word_from_hex_str(x, 0));
 
-  # Reg 200: product code (read-only).
+  # Reg 200: product code (read-only). Starts the read-only block 200-208: the
+  # heat pump rejects a read that crosses 199/200 (exception 2), so start a new range.
   - platform: modbus_controller
     modbus_controller_id: "heatpump"
     name: "Home Appliance Product Code"
@@ -454,6 +457,7 @@ text_sensor:
     response_size: 2
     raw_encode: HEXBYTES
     address: 200
+    force_new_range: true
     lambda: |-
       uint16_t raw = (uint16_t(data[item->offset]) << 8) | data[item->offset + 1];
       return std::to_string((raw & 0x00F0) >> 4);
