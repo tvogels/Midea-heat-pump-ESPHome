@@ -7,16 +7,21 @@
 // restores the original settings by itself.
 //
 // Register contract (Modbus holding registers, see README):
-//   reg 2  T1S, packed: zone 1 = low byte, zone 2 = high byte  -> mask 0x00FF
+//   reg 11 T1S zone 1, single-purpose register (whole value)    -> mask 0xFFFF
 //   reg 5  options, bit 0x1000 = weather compensation zone 1    -> mask 0x1000
-// Nothing else is ever written. Registers 0/6/7/8/212 are never written.
+// Nothing else is ever written. Registers 0/2/6/7/8/212 are never written.
+// Reg 11 mirrors the low byte of the packed reg 2 (verified on the live unit,
+// and the 120L Modbus doc recommends regs 11/12 for control), so T1S needs no
+// read-modify-write of reg 2 any more. There is no single-purpose register
+// for the weather-compensation bit, so reg 5 stays a masked RMW.
 // Register 0 is only *observed* (via the stock poll shadow) to log DHW-bit
-// drops that follow one of our writes.
+// drops that follow one of our writes. Reg 2 is only observed (stock poll
+// shadow) for external-change detection.
 //
-// Every write is a read-modify-write that starts from a *fresh* read of the
-// register (the wired controller shares the bus), touches only the masked
-// bits, is skipped if the bits already have the desired value (EEPROM
-// endurance), and is verified by a read-back with bounded retries.
+// Every write starts from a *fresh* read of the register (the wired
+// controller shares the bus), touches only the masked bits, is skipped if the
+// bits already have the desired value (EEPROM endurance), and is verified by
+// a read-back of the same register with bounded retries.
 //
 // Heat-pump EEPROM budget:
 //   * mid-lease T1S changes are rate limited to one write per
@@ -54,9 +59,10 @@ using esphome::modbus_controller::ModbusRegisterType;
 
 static const char *const TAG = "t1s_lease";
 
-static const uint16_t REG_T1S = 2;
+static const uint16_t REG_T1S = 11;         // single-purpose T1S zone 1 (mirrors reg 2 low byte)
 static const uint16_t REG_OPTIONS = 5;
-static const uint16_t MASK_T1S_Z1 = 0x00FF;
+static const uint16_t MASK_T1S_Z1 = 0xFFFF;  // reg 11 holds T1S z1 only: write the whole value
+static const uint16_t MASK_REG2_Z1 = 0x00FF; // reg 2 low byte (observed via the stock poll shadow)
 static const uint16_t MASK_WC_Z1 = 0x1000;
 static const uint16_t MASK_REG0_DHW = 0x0004;  // observed only, never written
 
@@ -348,9 +354,12 @@ class T1sLease {
     next_op_();
   }
 
+  // Snapshot = fresh read of reg 5, then a fresh read of reg 11.
+  uint16_t snap_reg_() const { return snap_step_ == 0 ? REG_OPTIONS : REG_T1S; }
   void begin_snapshot_() {
+    snap_step_ = 0;
     accept_seq_ = seq_ + 1;
-    read_(Io::SNAP_READ, REG_T1S, REG_OPTIONS - REG_T1S + 1);
+    read_(Io::SNAP_READ, snap_reg_(), 1);
   }
 
   void next_op_() {
@@ -421,9 +430,8 @@ class T1sLease {
           if (seq < accept_seq_) return;
           if (io_ != Io::SNAP_READ && io_ != Io::OP_READ && io_ != Io::VERIFY_READ) return;
           bool snap = io_ == Io::SNAP_READ;
-          uint16_t want_reg = snap ? REG_T1S : (ops_.empty() ? 0xFFFF : ops_.front().reg);
-          uint16_t want_cnt = snap ? (REG_OPTIONS - REG_T1S + 1) : 1;
-          if (reg != want_reg || count != want_cnt) return;
+          uint16_t want_reg = snap ? snap_reg_() : (ops_.empty() ? 0xFFFF : ops_.front().reg);
+          if (reg != want_reg || count != 1) return;
           std::vector<uint16_t> regs;
           for (size_t i = 0; i + 1 < data.size(); i += 2) regs.push_back((uint16_t(data[i]) << 8) | data[i + 1]);
           on_read_(reg, regs);
@@ -434,13 +442,27 @@ class T1sLease {
   void on_read_(uint16_t reg, const std::vector<uint16_t> &regs) {
     if (regs.empty()) return attempt_failed_("empty Modbus response");
     if (io_ == Io::SNAP_READ) {
-      if (regs.size() < 4) return attempt_failed_("short snapshot read");
-      uint16_t v2 = regs[0], v5 = regs[3];
-      update_shadow_(REG_T1S, v2);
-      update_shadow_(REG_OPTIONS, v5);
+      if (snap_step_ == 0) {
+        snap_v5_ = regs[0];
+        update_shadow_(REG_OPTIONS, snap_v5_);
+        snap_step_ = 1;
+        attempts_ = 0;
+        accept_seq_ = seq_ + 1;
+        return read_(Io::SNAP_READ, snap_reg_(), 1);
+      }
+      uint16_t v11 = regs[0], v5 = snap_v5_;
+      if (v11 < SNAP_T1S_MIN || v11 > SNAP_T1S_MAX) {
+        // Nothing written yet: refuse to start rather than snapshot garbage.
+        io_ = Io::NONE;
+        lease_ms_ = 0;
+        release_pending_ = false;
+        set_mode_(Mode::IDLE);
+        return error_("snapshot reg 11 = " + std::to_string(v11) + " out of range 5..65, supervision not started");
+      }
+      update_shadow_(REG_T1S, v11);
       snap_.magic = SNAPSHOT_MAGIC;
       snap_.wc_z1_was_on = (v5 & MASK_WC_Z1) ? 1 : 0;
-      snap_.t1s_z1 = v2 & MASK_T1S_Z1;
+      snap_.t1s_z1 = (uint8_t) v11;
       snap_.flags = 0;
       have_snapshot_ = true;
       persist_(1);  // must survive an immediate reboot
@@ -458,7 +480,7 @@ class T1sLease {
     uint16_t v = regs[0];
     update_shadow_(reg, v);  // real read: the shadow follows the unit, never our intent
     if (reg == REG_T1S) {
-      applied_t1s_ = v & MASK_T1S_Z1;
+      applied_t1s_ = (uint8_t) (v & 0x00FF);
       t1s_alt_valid_ = false;  // a real read resolves any uncertainty
     }
     if ((v & op.mask) == op.bits) return op_done_(true, "");  // already as desired, or verified
@@ -489,7 +511,7 @@ class T1sLease {
   void attempt_failed_(const std::string &why) {
     attempts_++;
     if (io_ == Io::SNAP_READ) {
-      if (attempts_ < MAX_ATTEMPTS) return read_(Io::SNAP_READ, REG_T1S, REG_OPTIONS - REG_T1S + 1);
+      if (attempts_ < MAX_ATTEMPTS) return read_(Io::SNAP_READ, snap_reg_(), 1);
       // Nothing written yet: abort supervision without touching anything.
       io_ = Io::NONE;
       lease_ms_ = 0;
@@ -526,7 +548,7 @@ class T1sLease {
           // The write may have landed without being verified: accept both
           // the last verified value and the target until a real read decides,
           // so the next stock poll is not mistaken for a user change.
-          t1s_alt_ = op.bits & MASK_T1S_Z1;
+          t1s_alt_ = (uint8_t) (op.bits & 0x00FF);
           t1s_alt_valid_ = true;
           break;
         default:
@@ -536,13 +558,15 @@ class T1sLease {
     next_op_();
   }
 
-  // Someone else (HA stock entities, wired controller) changed reg 2/5 during
+  // Someone else (HA stock entities, wired controller) changed T1S/reg 5 during
+  // the lease. T1S is observed via the stock reg 2 poll (low byte), which the
+  // unit keeps equal to reg 11.
   // the lease: adopt their change and end supervision; never fight it.
   bool check_drift_(uint32_t now) {
     if (now - last_io_end_ms_ < DRIFT_GRACE_MS) return false;
     if (shadow_reg2_ == nullptr || shadow_reg5_ == nullptr) return false;
     uint16_t r2 = *shadow_reg2_, r5 = *shadow_reg5_;
-    uint8_t t = r2 & MASK_T1S_Z1;
+    uint8_t t = r2 & MASK_REG2_Z1;
     if (t1s_alt_valid_ && t == t1s_alt_) {
       // The unverified write did land: that is our value, not drift.
       applied_t1s_ = t;
@@ -598,9 +622,11 @@ class T1sLease {
   }
 
   void update_shadow_(uint16_t reg, uint16_t v) {
-    if (reg == REG_T1S && shadow_reg2_) {
-      *shadow_reg2_ = v;
-      if (shadow_reg2_valid_) *shadow_reg2_valid_ = true;  // PR #1 RMW guard: real read
+    if (reg == REG_T1S && shadow_reg2_ && shadow_reg2_valid_ && *shadow_reg2_valid_) {
+      // Real read of reg 11: keep the reg 2 shadow's low byte (its mirror) in
+      // step until the next stock poll. The high byte (zone 2) is untouched;
+      // the shadow's valid flag is only ever set by a real reg 2 read.
+      *shadow_reg2_ = (*shadow_reg2_ & 0xFF00) | (v & 0x00FF);
     }
     if (reg == REG_OPTIONS && shadow_reg5_) {
       *shadow_reg5_ = v;
@@ -621,6 +647,8 @@ class T1sLease {
   uint16_t *shadow_reg5_{nullptr};
   bool *shadow_reg2_valid_{nullptr};
   bool *shadow_reg5_valid_{nullptr};
+  uint8_t snap_step_{0};    // 0 = reading reg 5, 1 = reading reg 11
+  uint16_t snap_v5_{0};
   esphome::ESPPreferenceObject pref_;
   Snapshot snap_{};
   bool have_snapshot_{false};
