@@ -7,6 +7,10 @@ esphome:
   project:
     name: "heatpump.Heatpump Controller"
     version: 10.1.0
+  # C++ helpers used by the lambdas in packages/ (namespace hp::).
+  includes:
+    - include/packed_register.h
+    - include/decoders.h
   # List form, so other packages can add their own on_boot hooks next to this one.
   on_boot:
     - priority: 600
