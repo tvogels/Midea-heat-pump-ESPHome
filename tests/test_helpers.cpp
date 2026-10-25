@@ -1,8 +1,7 @@
 // Host unit test for include/packed_register.h and include/decoders.h, plus a
 // smoke test of include/t1s_lease.h (which also gets it compiled and linted).
 //
-//   g++ -std=c++17 -Wall -Wextra -Werror -I tests/stubs -I include tests/test_helpers.cpp -o test_helpers
-//   ./test_helpers
+// Run with `make test`.
 #include "packed_register.h"
 #include "decoders.h"
 #include "t1s_lease.h"

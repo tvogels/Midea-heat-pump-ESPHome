@@ -1,7 +1,7 @@
 # ESPHome config for the Airwell Wellea M HT R290 monobloc at zwwg,
 # read and controlled over Modbus RTU by a LilyGO T-CAN485.
 #
-#   uvx esphome==2026.6.5 run heatpump.yaml --device heatpump.local
+#   make run    (see the Makefile for checks and builds)
 #
 # Each package is a plain ESPHome config fragment; ESPHome merges them.
 # See README.md for the layout and docs/registers.md for the register map.

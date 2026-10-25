@@ -4,3 +4,4 @@ warmtepomp-debug.yaml
 .venv/
 .esphome/
 heatpump-lease.tmp.yaml
+build/

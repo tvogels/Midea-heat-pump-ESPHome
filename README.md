@@ -24,6 +24,7 @@ include/
   packed_register.h           safe register writes used by the YAML lambdas
   decoders.h                  fault table and value-to-text decoders
   t1s_lease.h                 lease state machine (only with t1s-lease.yaml)
+Makefile                      checks, builds, flashing (pinned tool versions)
 tests/                        host unit test for include/*.h (+ ESPHome stubs, CI secrets)
 .yamllint                     YAML lint config
 .clang-format, .clang-tidy    C++ format and lint configs
@@ -38,7 +39,7 @@ Each package is a normal ESPHome config fragment; ESPHome merges them. There is 
 
 ## Build and flash
 
-Needs [uv](https://docs.astral.sh/uv/). Create `secrets.yaml` next to `heatpump.yaml` (it is git-ignored):
+Needs [uv](https://docs.astral.sh/uv/), make and a C++ compiler (on macOS: the Xcode command-line tools). Create `secrets.yaml` next to `heatpump.yaml` (it is git-ignored):
 
 ```yaml
 wifi_ssid: "..."
@@ -51,23 +52,13 @@ heatpump_api_encryption_key: "..."   # 32 random bytes, base64
 Then:
 
 ```sh
-uvx --from esphome==2026.6.5 esphome run heatpump.yaml                         # compile + flash (USB or OTA)
-uvx --from esphome==2026.6.5 esphome logs heatpump.yaml --device heatpump.local
+make run     # compile + flash heatpump.yaml (USB or OTA)
+make logs    # stream logs from heatpump.local (DEVICE=... for another host)
 ```
 
-Check before pushing (CI runs the same):
+Before pushing, run `make` (same as `make check`). It runs the host unit test of `include/*.h`, the linters (yamllint, clang-format, clang-tidy) and `esphome config` on both variants: `heatpump.yaml`, and `heatpump-lease.tmp.yaml`, which is generated with the lease package enabled. `make compile` builds both firmware variants, and `make format` fixes C++ formatting. The [Makefile](Makefile) pins the ESPHome and linter versions. clang-tidy runs on the host test, which includes every header in `include/`; `.clang-tidy` enables bug-finding checks only.
 
-```sh
-uvx --from esphome==2026.6.5 esphome config heatpump.yaml > /dev/null
-g++ -std=c++17 -Wall -Wextra -Werror -I tests/stubs -I include tests/test_helpers.cpp -o /tmp/t && /tmp/t
-uvx --from yamllint==1.38.0 yamllint --strict .
-uvx --from clang-format==23.1.3 clang-format --dry-run -Werror $(git ls-files '*.h' '*.cpp')  # -i to fix
-uvx --from clang-tidy==23.1.3 clang-tidy --quiet tests/test_helpers.cpp -- -std=c++17 -I tests/stubs -I include
-```
-
-On macOS, append `-isysroot $(xcrun --show-sdk-path)` to the clang-tidy command. clang-tidy runs on the host test, which includes every header in `include/`; `.clang-tidy` enables bug-finding checks only.
-
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the helper test and the linters, and compiles the firmware with and without the lease package, using the dummy secrets in `tests/secrets.ci.yaml`.
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `make test`, `make lint`, and `make config` plus `make compile` per variant, using the dummy secrets in `tests/secrets.ci.yaml`.
 
 ## Wiring
 
