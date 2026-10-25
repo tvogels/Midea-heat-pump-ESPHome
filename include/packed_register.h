@@ -6,7 +6,7 @@
 // so changing one setting is a read-modify-write against a *shadow*: a global
 // that every poll of the register refreshes (see capture()).
 //
-// Rules, shared by every write in this repo:
+// write_packed() rules:
 //   * refuse to write until the shadow holds a value really read from the
 //     heat pump (the initial 0 would clobber all other bits);
 //   * touch only the bits under the mask;
@@ -15,8 +15,13 @@
 //     builds on the first one.
 //
 // Registers 11/15/16/18 are single-purpose copies of fields inside regs 0/2/6
-// (V.E notes under reg 21). Writing those needs no read-modify-write;
-// write_verified() writes them and checks the result with a read-back.
+// (V.E notes under reg 21). Writing those needs no read-modify-write.
+// write_verified() refuses until the register was read once, skips unchanged
+// values, writes, and reads the same register back. The read-back updates the
+// shadow of the packed register the entity displays.
+//
+// Whole-register settings (most installer values) don't use these helpers;
+// ESPHome writes them directly.
 #pragma once
 
 #include "esphome/core/log.h"

@@ -18,7 +18,7 @@ There are four write styles:
 
 - **direct**: ESPHome writes the entity value (after scaling) as the whole register.
 - **packed**: one field inside a shared register. `hp::write_packed` does a read-modify-write on the shadow global: it refuses until the register was read once, changes only the masked bits, and skips the write if nothing changes.
-- **verified**: a single-purpose register. `hp::write_verified` refuses until the readback was read once, skips unchanged values, writes, then reads the register back.
+- **verified**: a single-purpose register. `hp::write_verified` refuses until that register was read once, skips unchanged values, writes, then reads the same register back.
 - **custom**: a hand-written `write_lambda`.
 
 ### Day-to-day (`controls.yaml`)
@@ -41,16 +41,16 @@ There are four write styles:
 | 16 | | verified | Water Flow Temperature Control Zone 1 |
 | 18 | | verified | Weather Compensation Curve Zone 1 (1–9) |
 
-Regs 11/15/16/18 are single-purpose copies of fields in the packed regs 2/0/0/6. The V.E table recommends them for control. They are read back from the packed registers:
+Regs 11/15/16/18 are single-purpose copies of fields in the packed regs 2/0/0/6. The V.E table recommends them for control. Each write is verified by reading the same single-purpose register back. The entity's state, however, comes from the field in the packed register:
 
-| Writes | Read back from |
+| Writes and verifies | Entity state from |
 | --- | --- |
 | reg 11 | reg 2 low byte (`0x00FF`) |
 | reg 15 | reg 0 bit `0x0004` |
 | reg 16 | reg 0 bit `0x0002` |
 | reg 18 | reg 6 low byte (`0x00FF`) |
 
-The write also updates that packed shadow, so the entity is right before the next poll. The *… Readback (reg NN)* diagnostic sensors show the raw single-purpose registers.
+The read-back callback also copies the value into that packed shadow, so the entity is right before the next poll. The *… Readback (reg NN)* diagnostic sensors show the raw single-purpose registers.
 
 ### Installer settings (`installer-settings.yaml`)
 

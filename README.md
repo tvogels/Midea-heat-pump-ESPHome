@@ -70,26 +70,28 @@ On the back of the wired controller (the display on the indoor unit), connect th
 
 ## How writes work
 
-Many Midea registers pack several settings into one 16-bit word (for example reg 5 holds ECO, silent mode, holiday and weather compensation bits). Modbus can only write a whole word. So every entity that changes one setting does a read-modify-write against a *shadow*, a global refreshed by each poll. The helpers in `include/packed_register.h` enforce the same rules everywhere:
+Many Midea registers pack several settings into one 16-bit word (for example reg 5 holds ECO, silent mode, holiday and weather compensation bits). Modbus can only write a whole word. So an entity that changes one of these fields does a read-modify-write against a *shadow*, a global refreshed by each poll. `hp::write_packed` in `include/packed_register.h` does this for every packed field:
 
 - No write before the register has been read once; the initial 0 would clear every other bit.
 - Only the bits of that setting change.
 - No write when nothing changes. The heat pump probably stores these settings in non-volatile memory of unknown endurance, so needless writes are avoided.
 
-For the day-to-day controls the heat pump offers single-purpose registers that hold just one field. We write those instead, and verify each write with a read-back:
+For the day-to-day controls the heat pump offers single-purpose registers that hold just one field. We write those instead with `hp::write_verified`: it refuses until that register was read once, skips unchanged values, and reads the same register back after writing. The entity itself still shows the field from the packed register:
 
-| Entity | Writes | Read from |
+| Entity | Writes (and reads back) | Entity state from |
 | --- | --- | --- |
 | Set Water Temperature T1S Zone 1 | reg 11 | reg 2 low byte |
 | Power DHW T5S | reg 15 | reg 0 bit 2 |
 | Water Flow Temperature Control Zone 1 | reg 16 | reg 0 bit 1 |
 | Weather Compensation Curve Zone 1 | reg 18 | reg 6 low byte |
 
-[docs/registers.md](docs/registers.md) lists every register the firmware can write.
+All other settings (mostly installer values) are whole registers that ESPHome writes as-is when you change the entity. [docs/registers.md](docs/registers.md) lists every register the firmware can write.
 
 ## Safety limit
 
-**Zone 1 water temperature is capped at 40 °C**: the `max_value` of *Set Water Temperature T1S Zone 1* and of the curve points T1SetH1/H2. The screed and floor covering set this limit. Don't raise it without checking them.
+The zone 1 heating controls we expose are capped at **40 °C**: *Set Water Temperature T1S Zone 1* (reg 11) and the curve points T1SetH1/H2 (regs 265/266). The screed and floor covering set this limit. Don't raise it without checking them.
+
+This is a limit on those inputs, not an interlock. The floor-drying program (*Highest Drying Temperature*, reg 258) still allows 55 °C, and the lease restores whatever T1S the heat pump had before it took over.
 
 ## Supervised T1S lease (opt-in)
 
