@@ -3,6 +3,18 @@
 `entity-migration.csv` lists every entity whose Home Assistant entity_id, display name or scaling changed in
 PR #6 (upstream Mosibi 10.0/10.1 renames and unit fixes), PR #4 (pruning, reg 128 bit 6/7 relabel) and PR #5 (names/scaling). It covers every entity_id change of the full stack #6 → #4 → #5 against site-zwwg 4929f0e (generated-model diff, checked by script). Use it to carry old InfluxDB history over to the new names.
 
+## Real entity ids: `hal_heat_pump_` prefix for new and renamed entities
+
+The firmware `devicename` is still `heatpump-controller`, but Home Assistant did **not** use it for entities that were
+new or renamed in this deploy. HA derived their entity_id from the device/area naming in its registry (the area is "Heat pump"), not from
+`devicename`, so they got the prefix `hal_heat_pump_`. Entities whose name did not change kept their existing
+registry entry and therefore `heatpump_controller_` (e.g. `sensor.heatpump_controller_unit_capacity`).
+The `new_entity_id` column holds the real ids, checked against the live HA entity list (area "Heat pump") on 2026-10-25,
+with spot checks in InfluxDB (`hal_heat_pump_heating_capacity_signed`, `hal_heat_pump_inverter_dc_bus_current`,
+`hal_heat_pump_special_function_settings_sg_evu`, `hal_heat_pump_total_dhw_electricity_consumed_for_master_unit`,
+`hal_heat_pump_room_thermostat_heat_demand_ht`). Binary sensors are logged in InfluxDB too (domain tag `binary_sensor`).
+If you rename entities in HA later, update this column to match.
+
 Columns:
 - `domain`: the HA domain (`sensor`, `binary_sensor`, `switch`, `select`, `number`). In InfluxDB this is the `domain` tag. `switch->select` marks a domain change (Silent Mode Level, #6); its `transform` maps off→`Level 1`, on→`Level 2`.
   Switches, selects and numbers are not recorded in the InfluxDB bucket (checked); their rows matter for HA dashboards/automations only.
@@ -26,21 +38,21 @@ Rules:
 Example: rescale reg 133 for September 2026.
 
 ```flux
-from(bucket: "homeassistant")
+from(bucket: "home_assistant")
   |> range(start: 2026-09-01T00:00:00Z, stop: 2026-10-01T00:00:00Z)
   |> filter(fn: (r) => r.domain == "sensor" and r.entity_id == "heatpump_controller_dc_bus_current" and r._field == "value")
-  |> map(fn: (r) => ({r with entity_id: "heatpump_controller_inverter_dc_bus_current", _value: r._value * 0.1}))
-  // |> to(bucket: "homeassistant")   // uncomment after dry run
+  |> map(fn: (r) => ({r with entity_id: "hal_heat_pump_inverter_dc_bus_current", _value: r._value * 0.1}))
+  // |> to(bucket: "home_assistant")   // uncomment after dry run
 ```
 
 When the id changes, set the new tag as well, e.g.
-`|> map(fn: (r) => ({r with entity_id: "heatpump_controller_hydraulic_module_capacity", _value: if r._value > 327.67 then r._value - 655.36 else r._value}))`.
+`|> map(fn: (r) => ({r with entity_id: "hal_heat_pump_hydraulic_module_capacity", _value: if r._value > 327.67 then r._value - 655.36 else r._value}))`.
 Copy the `friendly_name` tag over to the new display name too, if you use that tag.
 
 Deleting old series (per entity, per month only):
 
 ```sh
-influx delete --bucket homeassistant \
+influx delete --bucket home_assistant \
   --start 2026-09-01T00:00:00Z --stop 2026-10-01T00:00:00Z \
   --predicate '_measurement="A" AND entity_id="heatpump_controller_dc_bus_current"'
 ```
