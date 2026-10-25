@@ -1,10 +1,11 @@
 # Entity migration (zwwg site model)
 
 `entity-migration.csv` lists every entity whose Home Assistant entity_id, display name or scaling changed in
-PR #4 (pruning, reg 128 bit 6/7 relabel) and the names/scaling PR. Use it to carry old InfluxDB history over to the new names.
+PR #6 (upstream Mosibi 10.0/10.1 renames and unit fixes), PR #4 (pruning, reg 128 bit 6/7 relabel) and PR #5 (names/scaling). It covers every entity_id change of the full stack #6 → #4 → #5 against site-zwwg 4929f0e (generated-model diff, checked by script). Use it to carry old InfluxDB history over to the new names.
 
 Columns:
-- `domain`: the HA domain (`sensor`, `binary_sensor`, `switch`). In InfluxDB this is the `domain` tag.
+- `domain`: the HA domain (`sensor`, `binary_sensor`, `switch`, `select`, `number`). In InfluxDB this is the `domain` tag. `switch->select` marks a domain change (Silent Mode Level, #6); its `transform` maps off→`Level 1`, on→`Level 2`.
+  Switches, selects and numbers are not recorded in the InfluxDB bucket (checked); their rows matter for HA dashboards/automations only.
 - `old_entity_id` / `new_entity_id`: the object_id **without** the domain prefix. In InfluxDB this is the `entity_id` tag. An empty `new_entity_id` means the entity was removed.
 - `register`, `bit`: the Modbus holding register and bit (blank = whole register).
 - `transform`: what to apply to the old `value` before writing it under the new id.
@@ -43,4 +44,4 @@ influx delete --bucket homeassistant \
   --predicate '_measurement="A" AND entity_id="heatpump_controller_dc_bus_current"'
 ```
 
-(Use the actual `_measurement` of the series. HA writes the unit, e.g. `A`, `kWh`, `°C`, or `units`/`state` for unitless entities. For entities whose unit changed (reg 123 kWh→kW, 139 kW→none, reg 10 hr→none), the new series also lands under a new measurement.)
+(Use the actual `_measurement` of the series. HA writes the unit, e.g. `A`, `kWh`, `°C`, or `units`/`state` for unitless entities. For entities whose unit changed (reg 123 kWh→kW from #6, 139 kW→none, reg 10 hr→none; number reg 271 min→hr from #6), the new series also lands under a new measurement.)
