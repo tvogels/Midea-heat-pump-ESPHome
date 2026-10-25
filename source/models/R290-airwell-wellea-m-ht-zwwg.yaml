@@ -139,12 +139,13 @@ remove:
     - id: "${devicename}_power_reserved_bit_13"
     - id: "${devicename}_power_reserved_bit_14"
     - id: "${devicename}_power_reserved_bit_15"
-    - id: "${devicename}_function_setting_reserved_bit_0"
+    # Kept (documented functions, plausible in NL; renamed in PR #5):
+    #   reg 5 b0 Refrigerant Leakage Detection, reg 5 b14 C2 Fault Restore,
+    #   reg 210 b11 Enable DHW Priority Function, reg 211 b15 ACS Function Status
     - id: "${devicename}_function_setting_reserved_bit_1"
     - id: "${devicename}_function_setting_reserved_bit_2"
     - id: "${devicename}_function_setting_reserved_bit_3"
     - id: "${devicename}_function_setting_reserved_bit_9"
-    - id: "${devicename}_function_setting_reserved_bit_14"
     - id: "${devicename}_function_setting_reserved_bit_15"
     - id: "${devicename}_status_bit_1_reserved_bit_0"
     - id: "${devicename}_status_bit_1_reserved_bit_12"
@@ -165,8 +166,6 @@ remove:
     - id: "${devicename}_status_reserved_bit_6"
     - id: "${devicename}_status_reserved_bit_7"
     - id: "${devicename}_status_reserved_bit_13"
-    - id: "${devicename}_parameter_setting_1_reserved_bit_11"
-    - id: "${devicename}_parameter_setting_2_reserved_bit_15"
     - id: "${devicename}_parameter_setting_1_supports_water_tank_electric_heater_tbh"
 
   switch:
@@ -175,7 +174,7 @@ remove:
     - id: "${devicename}_parameter_setting_2_tw2_enabled"
     - id: "${devicename}_parameter_setting_2_setting_the_high_low_temperature_of_heating_mode_t1s"
     - id: "${devicename}_parameter_setting_2_setting_the_high_low_temperature_of_cooling_mode_t1s"
-    - id: "${devicename}_function_setting_dhw_pumps_running_constant_temperature_water_recycling"
+    - id: "${devicename}_dhw_pumps_running_constant_temperature_water_recycling"
     - id: "${devicename}_parameter_setting_1_dhw_pump_supported"
     - id: "${devicename}_parameter_setting_1_dhw_pump_supports_pipe_disinfect"
     - id: "${devicename}_parameter_setting_2_solar_energy_kit_enable"

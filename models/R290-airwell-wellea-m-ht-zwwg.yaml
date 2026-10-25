@@ -1443,10 +1443,20 @@ binary_sensor:
       return id(${devicename}_compressor_operating_frequency).state > 0;
 
   - platform: template
+    name: "Function Setting Reserved BIT 0"
+    id: "${devicename}_function_setting_reserved_bit_0"
+    icon: mdi:head-question-outline
+    lambda: "return (id(unmasked_value_register_5) & 0x01) == 0x01; // Return status bit1"
+  - platform: template
     name: "Holiday Away"
     id: "${devicename}_holiday_away"
     icon: mdi:eye
     lambda: "return (id(unmasked_value_register_5) & 0x20) == 0x20; // Return status bit5"
+  - platform: template
+    name: "Function Setting Reserved BIT 14"
+    id: "${devicename}_function_setting_reserved_bit_14"
+    icon: mdi:head-question-outline
+    lambda: "return (id(unmasked_value_register_5) & 0x4000) == 0x4000; // Return status bit14"
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "Status BIT 1 Defrosting"
@@ -1622,6 +1632,17 @@ binary_sensor:
     id: "${devicename}_parameter_setting_1_t1s_cooling_high_low_temperature_settings"
     icon: mdi:eye
     lambda: "return (id(unmasked_value_register_210) & 0x100) == 0x100; // Return status bit8"
+  - platform: template
+    name: "Parameter Setting 1 Reserved BIT 11"
+    id: "${devicename}_parameter_setting_1_reserved_bit_11"
+    icon: mdi:head-question-outline
+    lambda: "return (id(unmasked_value_register_210) & 0x800) == 0x800; // Return status bit11"
+  - platform: template
+    name: "Parameter Setting 2 Reserved BIT 15"
+    id: "${devicename}_parameter_setting_2_reserved_bit_15"
+    icon: mdi:head-question-outline
+    lambda: "return (id(unmasked_value_register_211) & 0x8000) == 0x8000; // Return status bit15"
+
   - platform: template
     name: "Heat pump running"
     id: "${devicename}_heat_pump_running"
@@ -1975,45 +1996,6 @@ switch:
           new_value &= ~checked_bit;                           //Clear and set
           if ((new_value) != id(unmasked_value_register_5)) {
             // ESP_LOGD("unmasked_value_register_5", "Set option to off f_s_eco_mode 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 5, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-  - platform: template
-    name: "DHW Pumps Running Constant Temperature Water Recycling"
-    id: "${devicename}_dhw_pumps_running_constant_temperature_water_recycling"
-    icon: mdi:eye
-    entity_category: config
-    restore_mode: DISABLED
-    optimistic: true
-    lambda: "return (id(unmasked_value_register_5) & 0x800) == 0x800;"
-    on_turn_on:
-      - lambda: |-
-          uint16_t checked_bit = 0x800;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
-          new_value &= ~checked_bit;                           // Clear and set
-          new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to on f_s_dhw_pumps_running_constant_temperature_water_recycling 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
-            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 5, new_value);
-            ${devicename}->queue_command(set_payload_command);
-          }
-    on_turn_off:
-      - lambda: |-
-          uint16_t checked_bit = 0x800;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
-            return;
-          }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
-          new_value &= ~checked_bit;                           // Clear and set
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to off f_s_dhw_pumps_running_constant_temperature_water_recycling 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
             id(unmasked_value_register_5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 5, new_value);
             ${devicename}->queue_command(set_payload_command);
