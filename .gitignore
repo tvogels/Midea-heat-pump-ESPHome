@@ -3,3 +3,4 @@ warmtepomp-debug.yaml
 secrets.yaml
 models/secrets.yaml
 .venv/
+__pycache__/
