@@ -636,3 +636,8 @@ modify:
       max_value: 40
     - id: "${devicename}_t1seth2"
       max_value: 40
+    # Reg 271 t_DELAY PUMP: upstream 10.1 relabelled the unit min -> hr, but the
+    # Midea R290 service manual (7.3.18.1) specifies minutes (range 2-20, step
+    # 0.5, raw x2); the 120L Modbus doc gives no usable unit. Restore minutes.
+    - id: "${devicename}_t_delay_pump"
+      unit_of_measurement: min
