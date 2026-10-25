@@ -31,6 +31,420 @@
 parent: R290-airwell-wellea-m-ht.yaml
 
 # -----------------------------------------------------------------------------
+# REPLACE — names, machine ids and scaling corrected against the Midea 120L
+# Modbus doc (0052003044313 V.E) and 30 days of InfluxDB data. Every rename or
+# rescale is listed in docs/entity-migration.csv. Regs 140/148/151/183/186 are
+# signed (they read 652-654 during defrost when decoded as U_WORD). Reg 133 is
+# sent as actual*10, so x0.1 is applied.
+# -----------------------------------------------------------------------------
+replace:
+  sensor:
+    - id: "${devicename}_t_sg_max"
+      newid: "${devicename}_special_function_settings"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Special Function Settings (SG-EVU)"
+      icon: mdi:transmission-tower
+      register_type: holding
+      address: 0xa
+      value_type: U_WORD
+    - id: "${devicename}_return_air_temperature"
+      newid: "${devicename}_compressor_suction_temperature_th"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Compressor Suction Temperature Th"
+      icon: mdi:temperature-celsius
+      register_type: holding
+      address: 0x6d
+      value_type: S_WORD
+      unit_of_measurement: "°C"
+      device_class: "temperature"
+      state_class: "measurement"
+    - id: "${devicename}_dc_bus_current"
+      newid: "${devicename}_inverter_dc_bus_current"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Inverter DC Bus Current"
+      icon: mdi:alpha-a
+      register_type: holding
+      address: 0x85
+      value_type: U_WORD
+      unit_of_measurement: A
+      device_class: "current"
+      state_class: "measurement"
+      filters:
+        - multiply: 0.1
+      accuracy_decimals: 1
+    - id: "${devicename}_limit_scheme_of_outdoor_unit_current"
+      newid: "${devicename}_odu_current_limitation_code"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "ODU Current Limitation Code"
+      icon: mdi:eye
+      register_type: holding
+      address: 0x8b
+      value_type: U_WORD
+    - id: "${devicename}_ability_of_hydraulic_module"
+      newid: "${devicename}_hydraulic_module_capacity"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Hydraulic Module Capacity"
+      icon: mdi:lightning-bolt
+      register_type: holding
+      address: 0x8c
+      value_type: S_WORD
+      unit_of_measurement: kW
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_realtime_heating_capacity"
+      newid: "${devicename}_heating_capacity_signed"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Heating Capacity (signed)"
+      icon: mdi:lightning-bolt
+      register_type: holding
+      address: 0x94
+      value_type: S_WORD
+      unit_of_measurement: "kW"
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_realtime_heating_cop"
+      newid: "${devicename}_heating_cop_signed"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Heating COP (signed)"
+      icon: mdi:copyleft
+      register_type: holding
+      address: 0x97
+      value_type: S_WORD
+      unit_of_measurement: "COP"
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_realtime_dhw_heating_capacity"
+      newid: "${devicename}_dhw_heating_capacity_signed"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "DHW Heating Capacity (signed)"
+      icon: mdi:lightning-bolt
+      register_type: holding
+      address: 0xB7
+      value_type: S_WORD
+      unit_of_measurement: "kW"
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_realtime_dhw_heating_cop"
+      newid: "${devicename}_dhw_heating_cop_signed"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "DHW Heating COP (signed)"
+      icon: mdi:copyleft
+      register_type: holding
+      address: 0xBA
+      value_type: S_WORD
+      unit_of_measurement: "COP"
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_heating_energy_produced_for_system"
+      newid: "${devicename}_total_energy_produced_system_all_modes"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total Energy Produced for System (all modes)"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0x98
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_renewable_heating_energy_produced_for_system"
+      newid: "${devicename}_total_renewable_energy_produced_system_all_modes"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total Renewable Energy Produced for System (all modes)"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0x9A
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_heating_power_consumed_for_system"
+      newid: "${devicename}_total_electricity_consumed_system_all_modes"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total Electricity Consumed for System (all modes)"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0x9C
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_heating_power_produced_for_master_unit"
+      newid: "${devicename}_total_heating_energy_produced_master_unit"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total Heating Energy Produced for Master Unit"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0x9E
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_renewable_heating_energy_produced_for_master_unit"
+      newid: "${devicename}_total_heating_renewable_energy_produced_master_unit"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total Heating Renewable Energy Produced for Master Unit"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0xA0
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_heating_power_consumed_for_master_unit"
+      newid: "${devicename}_total_heating_electricity_consumed_master_unit"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total Heating Electricity Consumed for Master Unit"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0xA2
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_cooling_energy_produced_for_master_unit"
+      newid: "${devicename}_total_cooling_energy_produced_master_unit"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total Cooling Energy Produced for Master Unit"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0xA5
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_cooling_renewable_energy_produced_for_master_unit"
+      newid: "${devicename}_total_cooling_renewable_energy_produced_master_unit"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total Cooling Renewable Energy Produced for Master Unit"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0xA7
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_cooling_power_consumed_for_master_unit"
+      newid: "${devicename}_total_cooling_electricity_consumed_master_unit"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total Cooling Electricity Consumed for Master Unit"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0xA9
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_dhw_energy_produced_for_master_unit"
+      newid: "${devicename}_total_dhw_energy_produced_master_unit"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total DHW Energy Produced for Master Unit"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0xAC
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_dhw_renewable_energy_produced_for_master_unit"
+      newid: "${devicename}_total_dhw_renewable_energy_produced_master_unit"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total DHW Renewable Energy Produced for Master Unit"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0xAE
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+    - id: "${devicename}_total_dhw_power_consumed_for_master_unit"
+      newid: "${devicename}_total_dhw_electricity_consumed_master_unit"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Total DHW Electricity Consumed for Master Unit"
+      icon: mdi:lightning-bolt-outline
+      register_type: holding
+      unit_of_measurement: "kWh"
+      device_class: energy
+      state_class: total_increasing
+      address: 0xB0
+      value_type: U_DWORD
+      accuracy_decimals: 2
+      filters:
+        - lambda: return x * 0.01;
+  binary_sensor:
+    # Documented reg 5/210/211 bits (Modbus doc) that the base labels "Reserved"
+    - id: "${devicename}_function_setting_reserved_bit_0"
+      newid: "${devicename}_function_setting_refrigerant_leakage_detection"
+      platform: template
+      name: "Function Setting Refrigerant Leakage Detection"
+      icon: mdi:eye
+      lambda: "return (id(unmasked_value_register_5) & 0x01) == 0x01; // Return status bit0"
+    - id: "${devicename}_function_setting_reserved_bit_14"
+      newid: "${devicename}_function_setting_c2_fault_restore"
+      platform: template
+      name: "Function Setting C2 Fault Restore"
+      icon: mdi:eye
+      lambda: "return (id(unmasked_value_register_5) & 0x4000) == 0x4000; // Return status bit14"
+    - id: "${devicename}_parameter_setting_1_reserved_bit_11"
+      newid: "${devicename}_parameter_setting_1_enable_dhw_priority_function"
+      platform: template
+      name: "Parameter Setting 1 Enable DHW Priority Function"
+      icon: mdi:eye
+      lambda: "return (id(unmasked_value_register_210) & 0x800) == 0x800; // Return status bit11"
+    - id: "${devicename}_parameter_setting_2_reserved_bit_15"
+      newid: "${devicename}_parameter_setting_2_acs_function_status"
+      platform: template
+      name: "Parameter Setting 2 ACS Function Status"
+      icon: mdi:eye
+      lambda: "return (id(unmasked_value_register_211) & 0x8000) == 0x8000; // Return status bit15"
+    - id: "${devicename}_load_output_heat4"
+      newid: "${devicename}_load_output_heat4"
+      platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Load Output HEAT4 (Crankcase-Chassis Heater)"
+      icon: mdi:eye
+      register_type: holding
+      address: 0x81
+      bitmask: 0x400
+  switch:
+    - id: "${devicename}_parameter_setting_1_room_thermostat"
+      newid: "${devicename}_parameter_setting_1_room_thermostat_mode_set"
+      platform: template
+      name: "Parameter Setting 1 Room Thermostat Mode Set"
+      icon: mdi:eye
+      restore_mode: DISABLED
+      entity_category: config
+      optimistic: true
+      lambda: "return (id(unmasked_value_register_210) & 0x4) == 0x4;"
+      on_turn_on:
+        - lambda: |-
+            uint16_t checked_bit = 0x4;
+            if (!id(unmasked_value_register_210_valid)) {
+              ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+              return;
+            }
+            uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
+            new_value &= ~checked_bit;                             // Clear and set
+            new_value += checked_bit;
+            if ((new_value) != id(unmasked_value_register_210)) {
+              // ESP_LOGD("unmasked_value_register_210", "Set option to on p_s_1_room_thermostat 0x%x -> 0x%x", id(unmasked_value_register_210), new_value);
+              id(unmasked_value_register_210) = new_value;
+              esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 210, new_value);
+              ${devicename}->queue_command(set_payload_command);
+            }
+      on_turn_off:
+        - lambda: |-
+            uint16_t checked_bit = 0x4;
+            if (!id(unmasked_value_register_210_valid)) {
+              ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_210 not yet read from heatpump, would clobber other bits");
+              return;
+            }
+            uint16_t new_value = id(unmasked_value_register_210);  // The original unmasked value
+            new_value &= ~checked_bit;                             // Clear and set
+            if ((new_value) != id(unmasked_value_register_210)) {
+              // ESP_LOGD("unmasked_value_register_210", "Set option to off p_s_1_room_thermostat 0x%x -> 0x%x", id(unmasked_value_register_210), new_value);
+              id(unmasked_value_register_210) = new_value;
+              esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 210, new_value);
+              ${devicename}->queue_command(set_payload_command);
+            }
+    - id: "${devicename}_parameter_setting_2_port_definition"
+      newid: "${devicename}_parameter_setting_2_m1m2_function"
+      platform: template
+      name: "Parameter Setting 2 M1M2 Function"
+      icon: mdi:eye
+      restore_mode: DISABLED
+      entity_category: config
+      optimistic: true
+      lambda: "return (id(unmasked_value_register_211) & 0x100) == 0x100;"
+      on_turn_on:
+        - lambda: |-
+            uint16_t checked_bit = 0x100;
+            if (!id(unmasked_value_register_211_valid)) {
+              ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+              return;
+            }
+            uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
+            new_value &= ~checked_bit;                             // Clear and set
+            new_value += checked_bit;
+            if ((new_value) != id(unmasked_value_register_211)) {
+              id(unmasked_value_register_211) = new_value;
+              esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
+              ${devicename}->queue_command(set_payload_command);
+            }
+      on_turn_off:
+        - lambda: |-
+            uint16_t checked_bit = 0x100;
+            if (!id(unmasked_value_register_211_valid)) {
+              ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_211 not yet read from heatpump, would clobber other bits");
+              return;
+            }
+            uint16_t new_value = id(unmasked_value_register_211);  // The original unmasked value
+            new_value &= ~checked_bit;                             // Clear and set
+            if ((new_value) != id(unmasked_value_register_211)) {
+              id(unmasked_value_register_211) = new_value;
+              esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
+              ${devicename}->queue_command(set_payload_command);
+            }
+
+# -----------------------------------------------------------------------------
 # REMOVE — features absent on this install
 # -----------------------------------------------------------------------------
 remove:
@@ -222,3 +636,8 @@ modify:
       max_value: 40
     - id: "${devicename}_t1seth2"
       max_value: 40
+    # Reg 271 t_DELAY PUMP: upstream 10.1 relabelled the unit min -> hr, but the
+    # Midea R290 service manual (7.3.18.1) specifies minutes (range 2-20, step
+    # 0.5, raw x2); the 120L Modbus doc gives no usable unit. Restore minutes.
+    - id: "${devicename}_t_delay_pump"
+      unit_of_measurement: min
