@@ -6,7 +6,7 @@
 // renewing a lease; if it stops (crash, network loss, ESP reboot), the ESP
 // restores the original settings by itself.
 //
-// Register contract (Modbus holding registers, see README):
+// Register contract (Modbus holding registers, see docs/t1s-lease.md):
 //   reg 11 T1S zone 1, single-purpose register (whole value)    -> mask 0xFFFF
 //   reg 5  options, bit 0x1000 = weather compensation zone 1    -> mask 0x1000
 // Nothing else is ever written. Registers 0/2/6/7/8/212 are never written.
