@@ -100,3 +100,58 @@ modify:
       max_value: 40
     - id: "${devicename}_t1seth2"
       max_value: 40
+
+# -----------------------------------------------------------------------------
+# ADD — read-only diagnostics for regs 11/15/16/18
+# -----------------------------------------------------------------------------
+# Midea 120L wired-controller Modbus table: regs 11/12 = T1S zone 1/2,
+# 14-17 = power zone2/DHW/zone1/room, 18/19 = curve selection. The doc says
+# they mirror regs 0/2/6 and are recommended for control. It is unknown
+# whether this unit implements them, so they are exposed read-only as
+# diagnostics only (no number/switch/select, no writes).
+# force_new_range: true on each so an unsupported register (Modbus
+# exception) can only fail its own read and never a neighbouring range.
+add:
+  sensor:
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "T1S Zone 1 (reg 11)"
+      id: "${devicename}_reg11_t1s_zone_1"
+      register_type: holding
+      address: 0x0B       # reg 11
+      value_type: U_WORD
+      unit_of_measurement: "°C"
+      device_class: temperature
+      accuracy_decimals: 0
+      force_new_range: true
+      entity_category: diagnostic
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Power DHW (reg 15)"
+      id: "${devicename}_reg15_power_dhw"
+      register_type: holding
+      address: 0x0F       # reg 15
+      value_type: U_WORD
+      accuracy_decimals: 0
+      force_new_range: true
+      entity_category: diagnostic
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Power Zone 1 (reg 16)"
+      id: "${devicename}_reg16_power_zone_1"
+      register_type: holding
+      address: 0x10       # reg 16
+      value_type: U_WORD
+      accuracy_decimals: 0
+      force_new_range: true
+      entity_category: diagnostic
+    - platform: modbus_controller
+      modbus_controller_id: "${devicename}"
+      name: "Curve Selection Zone 1 (reg 18)"
+      id: "${devicename}_reg18_curve_selection_zone_1"
+      register_type: holding
+      address: 0x12       # reg 18
+      value_type: U_WORD
+      accuracy_decimals: 0
+      force_new_range: true
+      entity_category: diagnostic
