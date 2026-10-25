@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [site-zwwg]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  ESPHOME_VERSION: "2026.6.5"
+
+jobs:
+  helpers:
+    name: C++ helper tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: g++ -std=c++17 -Wall -Wextra -Werror -I tests/stubs -I include tests/test_helpers.cpp -o test_helpers
+      - run: ./test_helpers
+
+  firmware:
+    name: Firmware (${{ matrix.variant }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [heatpump, heatpump-lease]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: platformio-${{ env.ESPHOME_VERSION }}
+      - name: Use dummy secrets
+        run: cp tests/secrets.ci.yaml secrets.yaml
+      - name: Select config
+        run: |
+          if [ "${{ matrix.variant }}" = heatpump-lease ]; then
+            # Same as heatpump.yaml with the opt-in lease package enabled.
+            sed 's|^  # - !include packages/t1s-lease.yaml$|  - !include packages/t1s-lease.yaml|' heatpump.yaml > heatpump-lease.tmp.yaml
+            grep -q '^  - !include packages/t1s-lease.yaml$' heatpump-lease.tmp.yaml
+            echo "CONFIG=heatpump-lease.tmp.yaml" >> "$GITHUB_ENV"
+          else
+            echo "CONFIG=heatpump.yaml" >> "$GITHUB_ENV"
+          fi
+      - name: Validate
+        run: uvx --from "esphome==$ESPHOME_VERSION" esphome config "$CONFIG" > /dev/null
+      - name: Compile
+        run: uvx --from "esphome==$ESPHOME_VERSION" esphome compile "$CONFIG"
