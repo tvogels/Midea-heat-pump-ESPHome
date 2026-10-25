@@ -15,7 +15,7 @@
 # Not changed here on purpose.
 
 substitutions:
-  # Minimum interval between mid-lease T1S (reg 2) writes to the heat pump.
+  # Minimum interval between mid-lease T1S (reg 11) writes to the heat pump.
   # Each write is one heat-pump EEPROM write. 900 s = max 4/h = 96/day
   # (~35k/year); a planner needing ~2 T1S changes per hour uses ~48/day
   # (~17.5k/year). The latest target is always the one written.
@@ -34,7 +34,7 @@ esphome:
       - lambda: |-
           t1s_lease::instance().setup(id(${devicename}),
                                       &id(unmasked_value_register_0),  // observed only (DHW bit)
-                                      &id(unmasked_value_water_temperature_t1s),
+                                      &id(unmasked_value_water_temperature_t1s),  // reg 2 shadow: observed (drift), low byte synced from reg 11 reads
                                       &id(unmasked_value_register_5),
                                       &id(unmasked_value_water_temperature_t1s_valid),
                                       &id(unmasked_value_register_5_valid),
@@ -106,7 +106,7 @@ sensor:
     id: "${devicename}_t1s_hp_write_count"
     icon: mdi:chip
     accuracy_decimals: 0
-    state_class: total_increasing  # reg 2/5 writes by the lease since boot
+    state_class: total_increasing  # reg 11/5 writes by the lease since boot
     update_interval: 60s
     lambda: "return t1s_lease::instance().write_count();"
   - platform: template
