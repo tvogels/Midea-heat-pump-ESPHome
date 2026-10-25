@@ -371,16 +371,14 @@ sensor:
     register_type: holding
     address: 0x9
     value_type: U_WORD
-  - platform: modbus_controller
+  - id: "${devicename}_special_function_settings"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "t_SG_MAX"
-    id: "${devicename}_t_sg_max"
-    icon: mdi:clock
+    name: "Special Function Settings (SG-EVU)"
+    icon: mdi:transmission-tower
     register_type: holding
     address: 0xa
     value_type: U_WORD
-    unit_of_measurement: hr
-
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "Compressor Operating Frequency"
@@ -469,10 +467,10 @@ sensor:
     unit_of_measurement: "°C"
     device_class: "temperature"
     state_class: "measurement"
-  - platform: modbus_controller
+  - id: "${devicename}_compressor_suction_temperature_th"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Return Air Temperature"
-    id: "${devicename}_return_air_temperature"
+    name: "Compressor Suction Temperature Th"
     icon: mdi:temperature-celsius
     register_type: holding
     address: 0x6d
@@ -599,15 +597,15 @@ sensor:
     address: 0x7a
     value_type: U_WORD
     unit_of_measurement: hr
-  - platform: modbus_controller
+  - id: "${devicename}_unit_capacity"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "Unit Capacity"
-    id: "${devicename}_unit_capacity"
     icon: mdi:lightning-bolt-circle
     register_type: holding
     address: 0x7b
     value_type: U_WORD
-    unit_of_measurement: "kWh"
+    unit_of_measurement: "kW"
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "Current Fault"
@@ -671,10 +669,10 @@ sensor:
     unit_of_measurement: Hz
     device_class: "frequency"
     state_class: "measurement"
-  - platform: modbus_controller
+  - id: "${devicename}_dc_bus_current"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "DC Bus Current"
-    id: "${devicename}_dc_bus_current"
     icon: mdi:alpha-a
     register_type: holding
     address: 0x85
@@ -682,6 +680,9 @@ sensor:
     unit_of_measurement: A
     device_class: "current"
     state_class: "measurement"
+    filters:
+      - multiply: 0.1
+    accuracy_decimals: 1
   - platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "DC Bus Voltage"
@@ -740,23 +741,22 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_odu_current_limitation_code"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Limit Scheme Of Outdoor Unit Current"
-    id: "${devicename}_limit_scheme_of_outdoor_unit_current"
+    name: "ODU Current Limitation Code"
     icon: mdi:eye
     register_type: holding
     address: 0x8b
     value_type: U_WORD
-    unit_of_measurement: "kW"
-  - platform: modbus_controller
+  - id: "${devicename}_hydraulic_module_capacity"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Ability Of Hydraulic Module"
-    id: "${devicename}_ability_of_hydraulic_module"
+    name: "Hydraulic Module Capacity"
     icon: mdi:lightning-bolt
     register_type: holding
     address: 0x8c
-    value_type: U_WORD
+    value_type: S_WORD
     unit_of_measurement: kW
     accuracy_decimals: 2
     filters:
@@ -1022,14 +1022,14 @@ sensor:
         return 99; // No mapping found
       }
 
-  - platform: modbus_controller
+  - id: "${devicename}_realtime_heating_capacity"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "Real-time heating Capacity"
-    id: "${devicename}_realtime_heating_capacity"
     icon: mdi:lightning-bolt
     register_type: holding
     address: 0x94
-    value_type: U_WORD
+    value_type: S_WORD
     unit_of_measurement: "kW"
     accuracy_decimals: 2
     filters:
@@ -1058,22 +1058,22 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_realtime_heating_cop"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "Real-time heating COP"
-    id: "${devicename}_realtime_heating_cop"
     icon: mdi:copyleft
     register_type: holding
     address: 0x97
-    value_type: U_WORD
+    value_type: S_WORD
     unit_of_measurement: "COP"
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_energy_produced_system_all_modes"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total heating energy produced for system"
-    id: "${devicename}_total_heating_energy_produced_for_system"
+    name: "Total Energy Produced for System (all modes)"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1084,10 +1084,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_renewable_energy_produced_system_all_modes"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total heating renewable energy produced for system"
-    id: "${devicename}_total_renewable_heating_energy_produced_for_system"
+    name: "Total Renewable Energy Produced for System (all modes)"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1098,10 +1098,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_electricity_consumed_system_all_modes"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total heating power consumed for system"
-    id: "${devicename}_total_heating_power_consumed_for_system"
+    name: "Total Electricity Consumed for System (all modes)"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1112,10 +1112,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_heating_energy_produced_master_unit"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total heating power produced for master unit"
-    id: "${devicename}_total_heating_power_produced_for_master_unit"
+    name: "Total Heating Energy Produced for Master Unit"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1126,10 +1126,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_heating_renewable_energy_produced_master_unit"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total renewable heating power produced for master unit"
-    id: "${devicename}_total_renewable_heating_energy_produced_for_master_unit"
+    name: "Total Heating Renewable Energy Produced for Master Unit"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1140,10 +1140,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_heating_electricity_consumed_master_unit"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total heating power consumed for master unit"
-    id: "${devicename}_total_heating_power_consumed_for_master_unit"
+    name: "Total Heating Electricity Consumed for Master Unit"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1165,10 +1165,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_cooling_energy_produced_master_unit"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total cooling energy produced for master unit"
-    id: "${devicename}_total_cooling_energy_produced_for_master_unit"
+    name: "Total Cooling Energy Produced for Master Unit"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1179,10 +1179,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_cooling_renewable_energy_produced_master_unit"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total cooling renewable energy produced for master unit"
-    id: "${devicename}_total_cooling_renewable_energy_produced_for_master_unit"
+    name: "Total Cooling Renewable Energy Produced for Master Unit"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1193,10 +1193,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_cooling_electricity_consumed_master_unit"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total cooling power consumed for master unit"
-    id: "${devicename}_total_cooling_power_consumed_for_master_unit"
+    name: "Total Cooling Electricity Consumed for Master Unit"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1218,10 +1218,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_dhw_energy_produced_master_unit"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total DHW energy produced for master unit"
-    id: "${devicename}_total_dhw_energy_produced_for_master_unit"
+    name: "Total DHW Energy Produced for Master Unit"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1232,10 +1232,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_dhw_renewable_energy_produced_master_unit"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total DHW renewable energy produced for master unit"
-    id: "${devicename}_total_dhw_renewable_energy_produced_for_master_unit"
+    name: "Total DHW Renewable Energy Produced for Master Unit"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1246,10 +1246,10 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_total_dhw_electricity_consumed_master_unit"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Total DHW power consumed for master unit"
-    id: "${devicename}_total_dhw_power_consumed_for_master_unit"
+    name: "Total DHW Electricity Consumed for Master Unit"
     icon: mdi:lightning-bolt-outline
     register_type: holding
     unit_of_measurement: "kWh"
@@ -1319,14 +1319,14 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_realtime_dhw_heating_capacity"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "Real-time DHW heating capacity"
-    id: "${devicename}_realtime_dhw_heating_capacity"
     icon: mdi:lightning-bolt
     register_type: holding
     address: 0xB7
-    value_type: U_WORD
+    value_type: S_WORD
     unit_of_measurement: "kW"
     accuracy_decimals: 2
     filters:
@@ -1355,14 +1355,14 @@ sensor:
     accuracy_decimals: 2
     filters:
       - lambda: return x * 0.01;
-  - platform: modbus_controller
+  - id: "${devicename}_realtime_dhw_heating_cop"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
     name: "Real-time DHW heating COP"
-    id: "${devicename}_realtime_dhw_heating_cop"
     icon: mdi:copyleft
     register_type: holding
     address: 0xBA
-    value_type: U_WORD
+    value_type: S_WORD
     unit_of_measurement: "COP"
     accuracy_decimals: 2
     filters:
@@ -1665,10 +1665,10 @@ binary_sensor:
     register_type: holding
     address: 0x80
     bitmask: 0x8
-  - platform: modbus_controller
+  - id: "${devicename}_status_bit_1_remote_on_off"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Status BIT 1 Remote On/Off"
-    id: "${devicename}_status_bit_1_remote_on_off"
+    name: "Status BIT 1 Remote On-Off"
     icon: mdi:eye
     register_type: holding
     address: 0x80
@@ -1844,10 +1844,10 @@ binary_sensor:
     register_type: holding
     address: 0x81
     bitmask: 0x200
-  - platform: modbus_controller
+  - id: "${devicename}_load_output_heat4"
+    platform: modbus_controller
     modbus_controller_id: "${devicename}"
-    name: "Load Output HEAT 4"
-    id: "${devicename}_load_output_heat4"
+    name: "Load Output HEAT4 (Crankcase-Chassis Heater)"
     icon: mdi:eye
     register_type: holding
     address: 0x81
@@ -2814,9 +2814,9 @@ switch:
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 210, new_value);
             ${devicename}->queue_command(set_payload_command);
           }
-  - platform: template
-    name: "Parameter Setting 1 Room Thermostat"
-    id: "${devicename}_parameter_setting_1_room_thermostat"
+  - id: "${devicename}_parameter_setting_1_room_thermostat_mode_set"
+    platform: template
+    name: "Parameter Setting 1 Room Thermostat Mode Set"
     icon: mdi:eye
     restore_mode: DISABLED
     entity_category: config
@@ -3511,9 +3511,9 @@ switch:
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
             ${devicename}->queue_command(set_payload_command);
           }
-  - platform: template
-    name: "Parameter Setting 2 Port Definition"
-    id: "${devicename}_parameter_setting_2_port_definition"
+  - id: "${devicename}_parameter_setting_2_m1m2_function"
+    platform: template
+    name: "Parameter Setting 2 M1M2 Function"
     icon: mdi:eye
     restore_mode: DISABLED
     entity_category: config
@@ -3548,6 +3548,10 @@ switch:
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(${devicename}, 211, new_value);
             ${devicename}->queue_command(set_payload_command);
           }
+
+# -----------------------------------------------------------------------------
+# REMOVE — features absent on this install
+# -----------------------------------------------------------------------------
   - platform: template
     name: "Parameter Setting 2 Solar Energy Kit Enable"
     id: "${devicename}_parameter_setting_2_solar_energy_kit_enable"
