@@ -31,11 +31,11 @@ esphome:
       then:
         - lambda: |-
             t1s_lease::instance().setup(id(heatpump),
-                                        &id(unmasked_value_register_0),  // observed only (DHW bit)
-                                        &id(unmasked_value_water_temperature_t1s),  // reg 2 shadow: observed (drift), low byte synced from reg 11 reads
-                                        &id(unmasked_value_register_5),
-                                        &id(unmasked_value_water_temperature_t1s_valid),
-                                        &id(unmasked_value_register_5_valid),
+                                        &id(reg0),  // observed only (DHW bit)
+                                        &id(reg2),  // reg 2 shadow: observed (drift), low byte synced from reg 11 reads
+                                        &id(reg5),
+                                        &id(reg2_valid),
+                                        &id(reg5_valid),
                                         ${t1s_min_write_interval_s});
 
 api:

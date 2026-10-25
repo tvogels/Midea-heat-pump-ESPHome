@@ -1,39 +1,39 @@
 # Day-to-day controls: power, mode, setpoints, curve selection (regs 0-18).
 
 globals:
-  - id: unmasked_value_register_0
+  - id: reg0
     type: uint16_t
     restore_value: no
     initial_value: '0'
-  - id: unmasked_value_register_5
+  - id: reg5
     type: uint16_t
     restore_value: no
     initial_value: '0'
-  - id: unmasked_value_water_temperature_t1s
+  - id: reg2
     type: uint16_t
     restore_value: no
     initial_value: '0'
-  - id: unmasked_curve_selection
+  - id: reg6
     type: uint16_t
     restore_value: no
     initial_value: '0'
-  - id: unmasked_value_register_0_valid
+  - id: reg0_valid
     type: bool
     restore_value: no
     initial_value: 'false'
-  - id: unmasked_value_register_5_valid
+  - id: reg5_valid
     type: bool
     restore_value: no
     initial_value: 'false'
-  - id: unmasked_value_water_temperature_t1s_valid
+  - id: reg2_valid
     type: bool
     restore_value: no
     initial_value: 'false'
-  - id: unmasked_curve_selection_valid
+  - id: reg6_valid
     type: bool
     restore_value: no
     initial_value: 'false'
-  - id: reg11_value
+  - id: reg11
     type: uint16_t
     restore_value: no
     initial_value: '0'
@@ -41,7 +41,7 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
-  - id: reg15_value
+  - id: reg15
     type: uint16_t
     restore_value: no
     initial_value: '0'
@@ -49,7 +49,7 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
-  - id: reg16_value
+  - id: reg16
     type: uint16_t
     restore_value: no
     initial_value: '0'
@@ -57,7 +57,7 @@ globals:
     type: bool
     restore_value: no
     initial_value: 'false'
-  - id: reg18_value
+  - id: reg18
     type: uint16_t
     restore_value: no
     initial_value: '0'
@@ -90,7 +90,7 @@ select:
       - "Level 1"
       - "Level 2"
     lambda: |-
-      if ((id(unmasked_value_register_5) & 0x80) == 0x80) {
+      if ((id(reg5) & 0x80) == 0x80) {
         return {"Level 2"};
       } else {
         return {"Level 1"};
@@ -98,19 +98,19 @@ select:
     set_action:
       - lambda: |-
           uint16_t checked_bit = 0x80;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+          if (!id(reg5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg5 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          uint16_t new_value = id(reg5);  // The original unmasked value
           if (x == "Level 2") {
             new_value |= checked_bit;
           } else {
             new_value &= ~checked_bit;
           }
-          if (new_value != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set silent_mode_level 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
+          if (new_value != id(reg5)) {
+            // ESP_LOGD("reg5", "Set silent_mode_level 0x%x -> 0x%x", id(reg5), new_value);
+            id(reg5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
             heatpump->queue_command(set_payload_command);
           }
@@ -137,11 +137,11 @@ number:
     max_value: 40
     mode: slider
     lambda: |-
-      // Update the global var unmasked_value_water_temperature_t1s
-      id(unmasked_value_water_temperature_t1s) = x;
-      id(unmasked_value_water_temperature_t1s_valid) = true;  // Shadow now holds a real value read from the heatpump
+      // Update the global var reg2
+      id(reg2) = x;
+      id(reg2_valid) = true;  // Shadow now holds a real value read from the heatpump
 
-      // ESP_LOGI("","unmasked_value_water_temperature_t1s: %d",id(unmasked_value_water_temperature_t1s));
+      // ESP_LOGI("","reg2: %d",id(reg2));
       uint8_t value_bytes[2];
       uint16_t value = x;
       value_bytes[0] = value >> 8;     // high byte (zone 2)
@@ -149,7 +149,7 @@ number:
       // ESP_LOGI("Register 2Low","Zone 1 is %d    Zone 2 is %d", value_bytes[1], value_bytes[0]);
       return value_bytes[1];
     write_lambda: |-
-      if (id(reg11_valid) && id(reg11_value) == (uint16_t) x) {
+      if (id(reg11_valid) && id(reg11) == (uint16_t) x) {
         ESP_LOGD("single_reg", "reg 11 already %u, no write", (unsigned) x);
         return {};
       }
@@ -169,11 +169,11 @@ number:
             uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
             if (rb != value) ESP_LOGW("single_reg", "Read-back reg 11 = %u, expected %u", rb, value);
             else ESP_LOGI("single_reg", "Read-back reg 11 = %u OK", rb);
-            id(reg11_value) = rb;
+            id(reg11) = rb;
             id(reg11_valid) = true;
             // Reg 2 low byte mirrors reg 11: keep the packed shadow consistent until the next poll.
-            if (id(unmasked_value_water_temperature_t1s_valid))
-              id(unmasked_value_water_temperature_t1s) = (id(unmasked_value_water_temperature_t1s) & 0xFF00) | (rb & 0x00FF);
+            if (id(reg2_valid))
+              id(reg2) = (id(reg2) & 0xFF00) | (rb & 0x00FF);
           }));
       return {};
 
@@ -227,11 +227,11 @@ number:
     max_value: 9
     mode: slider
     lambda: |-
-      // Update the global var unmasked_curve_selection
-      id(unmasked_curve_selection) = x;
-      id(unmasked_curve_selection_valid) = true;  // Shadow now holds a real value read from the heatpump
+      // Update the global var reg6
+      id(reg6) = x;
+      id(reg6_valid) = true;  // Shadow now holds a real value read from the heatpump
 
-      // ESP_LOGI("","unmasked_curve_selection: %d",id(unmasked_curve_selection));
+      // ESP_LOGI("","reg6: %d",id(reg6));
 
       uint8_t value_bytes[2];
       uint16_t value = x;
@@ -243,7 +243,7 @@ number:
 
       return value_bytes[1];
     write_lambda: |-
-      if (id(reg18_valid) && id(reg18_value) == (uint16_t) x) {
+      if (id(reg18_valid) && id(reg18) == (uint16_t) x) {
         ESP_LOGD("single_reg", "reg 18 already %u, no write", (unsigned) x);
         return {};
       }
@@ -263,11 +263,11 @@ number:
             uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
             if (rb != value) ESP_LOGW("single_reg", "Read-back reg 18 = %u, expected %u", rb, value);
             else ESP_LOGI("single_reg", "Read-back reg 18 = %u OK", rb);
-            id(reg18_value) = rb;
+            id(reg18) = rb;
             id(reg18_valid) = true;
             // Reg 6 low byte mirrors reg 18.
-            if (id(unmasked_curve_selection_valid))
-              id(unmasked_curve_selection) = (id(unmasked_curve_selection) & 0xFF00) | (rb & 0x00FF);
+            if (id(reg6_valid))
+              id(reg6) = (id(reg6) & 0xFF00) | (rb & 0x00FF);
           }));
       return {};
 
@@ -281,35 +281,35 @@ switch:
     entity_category: config
     restore_mode: DISABLED
     optimistic: true
-    lambda: "return (id(unmasked_value_register_0) & 0x1) == 0x1;"
+    lambda: "return (id(reg0) & 0x1) == 0x1;"
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x1;
-          if (!id(unmasked_value_register_0_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+          if (!id(reg0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg0 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
+          uint16_t new_value = id(reg0);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_0)) {
-            // ESP_LOGD("unmasked_value_register_0", "Set option to on power_air_conditioner_zone_1 0x%x -> 0x%x", id(unmasked_value_register_0), new_value);
-            id(unmasked_value_register_0) = new_value;
+          if ((new_value) != id(reg0)) {
+            // ESP_LOGD("reg0", "Set option to on power_air_conditioner_zone_1 0x%x -> 0x%x", id(reg0), new_value);
+            id(reg0) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 0x0, new_value);
             heatpump->queue_command(set_payload_command);
           }
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x1;
-          if (!id(unmasked_value_register_0_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+          if (!id(reg0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg0 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
+          uint16_t new_value = id(reg0);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
-          if ((new_value) != id(unmasked_value_register_0)) {
-            // ESP_LOGD("unmasked_value_register_0", "Set option to off power_air_conditioner_zone_1 0x%x -> 0x%x", id(unmasked_value_register_0), new_value);
-            id(unmasked_value_register_0) = new_value;
+          if ((new_value) != id(reg0)) {
+            // ESP_LOGD("reg0", "Set option to off power_air_conditioner_zone_1 0x%x -> 0x%x", id(reg0), new_value);
+            id(reg0) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 0x0, new_value);
             heatpump->queue_command(set_payload_command);
           }
@@ -324,10 +324,10 @@ switch:
     entity_category: config
     restore_mode: DISABLED
     optimistic: true
-    lambda: "return (id(unmasked_value_register_0) & 0x2) == 0x2; // Return bit 0x2 status"
+    lambda: "return (id(reg0) & 0x2) == 0x2; // Return bit 0x2 status"
     on_turn_on:
       - lambda: |-
-          if (id(reg16_valid) && id(reg16_value) == 1) {
+          if (id(reg16_valid) && id(reg16) == 1) {
             ESP_LOGD("single_reg", "reg 16 already 1, no write");
             return;
           }
@@ -347,17 +347,17 @@ switch:
                 uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
                 if (rb != value) ESP_LOGW("single_reg", "Read-back reg 16 = %u, expected %u", rb, value);
                 else ESP_LOGI("single_reg", "Read-back reg 16 = %u OK", rb);
-                id(reg16_value) = rb;
+                id(reg16) = rb;
                 id(reg16_valid) = true;
                 // Reg 0 bit 0x2 mirrors this register: keep the packed shadow consistent until the next poll.
-                if (id(unmasked_value_register_0_valid)) {
-                  if (rb) id(unmasked_value_register_0) |= 0x2;
-                  else id(unmasked_value_register_0) &= ~0x2;
+                if (id(reg0_valid)) {
+                  if (rb) id(reg0) |= 0x2;
+                  else id(reg0) &= ~0x2;
                 }
               }));
     on_turn_off:
       - lambda: |-
-          if (id(reg16_valid) && id(reg16_value) == 0) {
+          if (id(reg16_valid) && id(reg16) == 0) {
             ESP_LOGD("single_reg", "reg 16 already 0, no write");
             return;
           }
@@ -377,12 +377,12 @@ switch:
                 uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
                 if (rb != value) ESP_LOGW("single_reg", "Read-back reg 16 = %u, expected %u", rb, value);
                 else ESP_LOGI("single_reg", "Read-back reg 16 = %u OK", rb);
-                id(reg16_value) = rb;
+                id(reg16) = rb;
                 id(reg16_valid) = true;
                 // Reg 0 bit 0x2 mirrors this register: keep the packed shadow consistent until the next poll.
-                if (id(unmasked_value_register_0_valid)) {
-                  if (rb) id(unmasked_value_register_0) |= 0x2;
-                  else id(unmasked_value_register_0) &= ~0x2;
+                if (id(reg0_valid)) {
+                  if (rb) id(reg0) |= 0x2;
+                  else id(reg0) &= ~0x2;
                 }
               }));
 
@@ -395,10 +395,10 @@ switch:
     restore_mode: DISABLED
     optimistic: true
     lambda: |-
-      return (id(unmasked_value_register_0) & 0x4) == 0x4;
+      return (id(reg0) & 0x4) == 0x4;
     on_turn_on:
       - lambda: |-
-          if (id(reg15_valid) && id(reg15_value) == 1) {
+          if (id(reg15_valid) && id(reg15) == 1) {
             ESP_LOGD("single_reg", "reg 15 already 1, no write");
             return;
           }
@@ -418,17 +418,17 @@ switch:
                 uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
                 if (rb != value) ESP_LOGW("single_reg", "Read-back reg 15 = %u, expected %u", rb, value);
                 else ESP_LOGI("single_reg", "Read-back reg 15 = %u OK", rb);
-                id(reg15_value) = rb;
+                id(reg15) = rb;
                 id(reg15_valid) = true;
                 // Reg 0 bit 0x4 mirrors this register: keep the packed shadow consistent until the next poll.
-                if (id(unmasked_value_register_0_valid)) {
-                  if (rb) id(unmasked_value_register_0) |= 0x4;
-                  else id(unmasked_value_register_0) &= ~0x4;
+                if (id(reg0_valid)) {
+                  if (rb) id(reg0) |= 0x4;
+                  else id(reg0) &= ~0x4;
                 }
               }));
     on_turn_off:
       - lambda: |-
-          if (id(reg15_valid) && id(reg15_value) == 0) {
+          if (id(reg15_valid) && id(reg15) == 0) {
             ESP_LOGD("single_reg", "reg 15 already 0, no write");
             return;
           }
@@ -448,12 +448,12 @@ switch:
                 uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
                 if (rb != value) ESP_LOGW("single_reg", "Read-back reg 15 = %u, expected %u", rb, value);
                 else ESP_LOGI("single_reg", "Read-back reg 15 = %u OK", rb);
-                id(reg15_value) = rb;
+                id(reg15) = rb;
                 id(reg15_valid) = true;
                 // Reg 0 bit 0x4 mirrors this register: keep the packed shadow consistent until the next poll.
-                if (id(unmasked_value_register_0_valid)) {
-                  if (rb) id(unmasked_value_register_0) |= 0x4;
-                  else id(unmasked_value_register_0) &= ~0x4;
+                if (id(reg0_valid)) {
+                  if (rb) id(reg0) |= 0x4;
+                  else id(reg0) &= ~0x4;
                 }
               }));
 
@@ -464,35 +464,35 @@ switch:
     entity_category: config
     restore_mode: DISABLED
     optimistic: true
-    lambda: "return (id(unmasked_value_register_5) & 0x10) == 0x10; // Return status bit 4"
+    lambda: "return (id(reg5) & 0x10) == 0x10; // Return status bit 4"
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x10;                         // Bit to change
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+          if (!id(reg5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg5 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          uint16_t new_value = id(reg5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to on f_s_disinfect 0x%x -> 0x%xs", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
+          if ((new_value) != id(reg5)) {
+            // ESP_LOGD("reg5", "Set option to on f_s_disinfect 0x%x -> 0x%xs", id(reg5), new_value);
+            id(reg5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
             heatpump->queue_command(set_payload_command);
           }
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x10;                         // Bit to change
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+          if (!id(reg5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg5 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          uint16_t new_value = id(reg5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to off f_s_disinfect 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
+          if ((new_value) != id(reg5)) {
+            // ESP_LOGD("reg5", "Set option to off f_s_disinfect 0x%x -> 0x%x", id(reg5), new_value);
+            id(reg5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
             heatpump->queue_command(set_payload_command);
           }
@@ -504,35 +504,35 @@ switch:
     entity_category: config
     restore_mode: DISABLED
     optimistic: true
-    lambda: "return (id(unmasked_value_register_5) & 0x40) == 0x40;"
+    lambda: "return (id(reg5) & 0x40) == 0x40;"
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x40;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+          if (!id(reg5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg5 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          uint16_t new_value = id(reg5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to on f_s_silent_mode 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
+          if ((new_value) != id(reg5)) {
+            // ESP_LOGD("reg5", "Set option to on f_s_silent_mode 0x%x -> 0x%x", id(reg5), new_value);
+            id(reg5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 0x5, new_value);
             heatpump->queue_command(set_payload_command);
           }
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x40;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+          if (!id(reg5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg5 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          uint16_t new_value = id(reg5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to off f_s_silent_mode 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
+          if ((new_value) != id(reg5)) {
+            // ESP_LOGD("reg5", "Set option to off f_s_silent_mode 0x%x -> 0x%x", id(reg5), new_value);
+            id(reg5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 0x5, new_value);
             heatpump->queue_command(set_payload_command);
           }
@@ -545,35 +545,35 @@ switch:
     entity_category: config
     restore_mode: DISABLED
     optimistic: true
-    lambda: "return (id(unmasked_value_register_5) & 0x100) == 0x100;"
+    lambda: "return (id(reg5) & 0x100) == 0x100;"
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x100;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+          if (!id(reg5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg5 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          uint16_t new_value = id(reg5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to on f_s_holiday_home 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
+          if ((new_value) != id(reg5)) {
+            // ESP_LOGD("reg5", "Set option to on f_s_holiday_home 0x%x -> 0x%x", id(reg5), new_value);
+            id(reg5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
             heatpump->queue_command(set_payload_command);
           }
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x100;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+          if (!id(reg5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg5 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          uint16_t new_value = id(reg5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to off f_s_holiday_home 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
+          if ((new_value) != id(reg5)) {
+            // ESP_LOGD("reg5", "Set option to off f_s_holiday_home 0x%x -> 0x%x", id(reg5), new_value);
+            id(reg5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
             heatpump->queue_command(set_payload_command);
           }
@@ -585,35 +585,35 @@ switch:
     entity_category: config
     restore_mode: DISABLED
     optimistic: true
-    lambda: "return (id(unmasked_value_register_5) & 0x400) == 0x400;"
+    lambda: "return (id(reg5) & 0x400) == 0x400;"
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x400;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+          if (!id(reg5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg5 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          uint16_t new_value = id(reg5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to on f_s_eco_mode 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
+          if ((new_value) != id(reg5)) {
+            // ESP_LOGD("reg5", "Set option to on f_s_eco_mode 0x%x -> 0x%x", id(reg5), new_value);
+            id(reg5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
             heatpump->queue_command(set_payload_command);
           }
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x400;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+          if (!id(reg5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg5 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          uint16_t new_value = id(reg5);  // The original unmasked value
           new_value &= ~checked_bit;                           //Clear and set
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to off f_s_eco_mode 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
+          if ((new_value) != id(reg5)) {
+            // ESP_LOGD("reg5", "Set option to off f_s_eco_mode 0x%x -> 0x%x", id(reg5), new_value);
+            id(reg5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
             heatpump->queue_command(set_payload_command);
           }
@@ -626,35 +626,35 @@ switch:
     entity_category: config
     restore_mode: DISABLED
     optimistic: true
-    lambda: "return (id(unmasked_value_register_5) & 0x1000) == 0x1000;"
+    lambda: "return (id(reg5) & 0x1000) == 0x1000;"
     on_turn_on:
       - lambda: |-
           uint16_t checked_bit = 0x1000;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+          if (!id(reg5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg5 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          uint16_t new_value = id(reg5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
           new_value += checked_bit;
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to on weather_compensation_zone_1 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
+          if ((new_value) != id(reg5)) {
+            // ESP_LOGD("reg5", "Set option to on weather_compensation_zone_1 0x%x -> 0x%x", id(reg5), new_value);
+            id(reg5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
             heatpump->queue_command(set_payload_command);
           }
     on_turn_off:
       - lambda: |-
           uint16_t checked_bit = 0x1000;
-          if (!id(unmasked_value_register_5_valid)) {
-            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+          if (!id(reg5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: reg5 not yet read from heatpump, would clobber other bits");
             return;
           }
-          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          uint16_t new_value = id(reg5);  // The original unmasked value
           new_value &= ~checked_bit;                           // Clear and set
-          if ((new_value) != id(unmasked_value_register_5)) {
-            // ESP_LOGD("unmasked_value_register_5", "Set option to off weather_compensation_zone_1 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
-            id(unmasked_value_register_5) = new_value;
+          if ((new_value) != id(reg5)) {
+            // ESP_LOGD("reg5", "Set option to off weather_compensation_zone_1 0x%x -> 0x%x", id(reg5), new_value);
+            id(reg5) = new_value;
             esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
             heatpump->queue_command(set_payload_command);
           }
@@ -696,9 +696,9 @@ sensor:
     value_type: U_WORD
     icon: mdi:eye
     lambda: |-
-      // Update the global var unmasked_value_register_0
-      id(unmasked_value_register_0) = x;
-      id(unmasked_value_register_0_valid) = true;  // Shadow now holds a real value read from the heatpump
+      // Update the global var reg0
+      id(reg0) = x;
+      id(reg0_valid) = true;  // Shadow now holds a real value read from the heatpump
       return x;
 
   # Reg 5 (function settings), read whole into the shadow global used by the reg 5 switches/selects.
@@ -712,9 +712,9 @@ sensor:
     value_type: U_WORD
     icon: mdi:eye
     lambda: |-
-      // Update the global var unmasked_value_register_5
-      id(unmasked_value_register_5) = x;
-      id(unmasked_value_register_5_valid) = true;  // Shadow now holds a real value read from the heatpump
+      // Update the global var reg5
+      id(reg5) = x;
+      id(reg5_valid) = true;  // Shadow now holds a real value read from the heatpump
       return x;
 
   # Reg 10 bit 1 SG, bit 2 EVU (read-only here).
@@ -746,7 +746,7 @@ sensor:
     force_new_range: true
     entity_category: diagnostic
     lambda: |-
-      id(reg11_value) = x;
+      id(reg11) = x;
       id(reg11_valid) = true;  // real read: writes to reg 11 are allowed from now on
       return x;
 
@@ -762,7 +762,7 @@ sensor:
     force_new_range: true
     entity_category: diagnostic
     lambda: |-
-      id(reg15_value) = x;
+      id(reg15) = x;
       id(reg15_valid) = true;  // real read: writes to reg 15 are allowed from now on
       return x;
 
@@ -778,7 +778,7 @@ sensor:
     force_new_range: true
     entity_category: diagnostic
     lambda: |-
-      id(reg16_value) = x;
+      id(reg16) = x;
       id(reg16_valid) = true;  // real read: writes to reg 16 are allowed from now on
       return x;
 
@@ -794,7 +794,7 @@ sensor:
     force_new_range: true
     entity_category: diagnostic
     lambda: |-
-      id(reg18_value) = x;
+      id(reg18) = x;
       id(reg18_valid) = true;  // real read: writes to reg 18 are allowed from now on
       return x;
 
@@ -803,16 +803,16 @@ binary_sensor:
     platform: template
     name: "Function Setting Refrigerant Leakage Detection"
     icon: mdi:eye
-    lambda: "return (id(unmasked_value_register_5) & 0x01) == 0x01; // Return status bit0"
+    lambda: "return (id(reg5) & 0x01) == 0x01; // Return status bit0"
 
   - platform: template
     name: "Holiday Away"
     id: "heatpump_holiday_away"
     icon: mdi:eye
-    lambda: "return (id(unmasked_value_register_5) & 0x20) == 0x20; // Return status bit5"
+    lambda: "return (id(reg5) & 0x20) == 0x20; // Return status bit5"
 
   - id: "heatpump_function_setting_c2_fault_restore"
     platform: template
     name: "Function Setting C2 Fault Restore"
     icon: mdi:eye
-    lambda: "return (id(unmasked_value_register_5) & 0x4000) == 0x4000; // Return status bit14"
+    lambda: "return (id(reg5) & 0x4000) == 0x4000; // Return status bit14"
