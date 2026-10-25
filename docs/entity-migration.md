@@ -14,6 +14,7 @@ Columns:
   - `u16->s16 …`: old data was decoded unsigned, so negative values (defrost) appear as ~652–655 after the ×0.01 scale. Map `v > 327.67 ? v - 655.36 : v`.
   - `delete: …`: do not import. The values are a sentinel (reg 111 = 25 means unavailable).
 - `valid_from_notes`: which deploy introduces the change. Rows apply to data **before** that deploy.
+- `series_changes`: why the InfluxDB series (measurement = unit, `entity_id` tag) of the new entity differs from the old one: `unit` (measurement changes), `entity_id` (tag changes), `domain`, or `none`/`removed`. Rule: every entity whose values change meaning (scale, sign, unit) has `unit` and/or `entity_id` here, so old and new values never land in the same series. Regs 133/148/151/183/186 keep their unit, so they were renamed (e.g. DC Bus Current → Inverter DC Bus Current, Real-time heating Capacity → Heating Capacity (signed)).
 
 ## Applying to InfluxDB (v2 / Flux)
 
@@ -28,7 +29,7 @@ Example: rescale reg 133 for September 2026.
 from(bucket: "homeassistant")
   |> range(start: 2026-09-01T00:00:00Z, stop: 2026-10-01T00:00:00Z)
   |> filter(fn: (r) => r.domain == "sensor" and r.entity_id == "heatpump_controller_dc_bus_current" and r._field == "value")
-  |> map(fn: (r) => ({r with _value: r._value * 0.1}))
+  |> map(fn: (r) => ({r with entity_id: "heatpump_controller_inverter_dc_bus_current", _value: r._value * 0.1}))
   // |> to(bucket: "homeassistant")   // uncomment after dry run
 ```
 

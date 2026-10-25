@@ -61,10 +61,10 @@ replace:
       device_class: "temperature"
       state_class: "measurement"
     - id: "${devicename}_dc_bus_current"
-      newid: "${devicename}_dc_bus_current"
+      newid: "${devicename}_inverter_dc_bus_current"
       platform: modbus_controller
       modbus_controller_id: "${devicename}"
-      name: "DC Bus Current"
+      name: "Inverter DC Bus Current"
       icon: mdi:alpha-a
       register_type: holding
       address: 0x85
@@ -98,10 +98,10 @@ replace:
       filters:
         - lambda: return x * 0.01;
     - id: "${devicename}_realtime_heating_capacity"
-      newid: "${devicename}_realtime_heating_capacity"
+      newid: "${devicename}_heating_capacity_signed"
       platform: modbus_controller
       modbus_controller_id: "${devicename}"
-      name: "Real-time heating Capacity"
+      name: "Heating Capacity (signed)"
       icon: mdi:lightning-bolt
       register_type: holding
       address: 0x94
@@ -111,10 +111,10 @@ replace:
       filters:
         - lambda: return x * 0.01;
     - id: "${devicename}_realtime_heating_cop"
-      newid: "${devicename}_realtime_heating_cop"
+      newid: "${devicename}_heating_cop_signed"
       platform: modbus_controller
       modbus_controller_id: "${devicename}"
-      name: "Real-time heating COP"
+      name: "Heating COP (signed)"
       icon: mdi:copyleft
       register_type: holding
       address: 0x97
@@ -124,10 +124,10 @@ replace:
       filters:
         - lambda: return x * 0.01;
     - id: "${devicename}_realtime_dhw_heating_capacity"
-      newid: "${devicename}_realtime_dhw_heating_capacity"
+      newid: "${devicename}_dhw_heating_capacity_signed"
       platform: modbus_controller
       modbus_controller_id: "${devicename}"
-      name: "Real-time DHW heating capacity"
+      name: "DHW Heating Capacity (signed)"
       icon: mdi:lightning-bolt
       register_type: holding
       address: 0xB7
@@ -137,10 +137,10 @@ replace:
       filters:
         - lambda: return x * 0.01;
     - id: "${devicename}_realtime_dhw_heating_cop"
-      newid: "${devicename}_realtime_dhw_heating_cop"
+      newid: "${devicename}_dhw_heating_cop_signed"
       platform: modbus_controller
       modbus_controller_id: "${devicename}"
-      name: "Real-time DHW heating COP"
+      name: "DHW Heating COP (signed)"
       icon: mdi:copyleft
       register_type: holding
       address: 0xBA
