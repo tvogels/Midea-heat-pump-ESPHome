@@ -15,6 +15,7 @@ struct Fault {
   const char *description;
 };
 
+// clang-format off
 static const Fault FAULTS[] = {
     {  0, "OK", "OK"},
     {  1, "E0", "Water flow fault(E8 displayed 3 times)"},
@@ -70,6 +71,7 @@ static const Fault FAULTS[] = {
     {142, "L8", "Speed difference > 15Hz protection between the front and the back clock"},
     {143, "L9", "Speed difference > 15Hz protection between the real and the setting speed"},
 };
+// clang-format on
 
 // Numbers 0-143 without a table entry are returned as the number itself.
 inline std::string fault_lookup(int number, bool description) {

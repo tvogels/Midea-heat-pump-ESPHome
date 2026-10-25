@@ -90,8 +90,8 @@ inline void write_verified(ModbusController *ctrl, uint16_t reg, const char *lab
   // The references point at ESPHome globals, which live for the whole program.
   ctrl->queue_command(ModbusCommandItem::create_read_command(
       ctrl, ModbusRegisterType::HOLDING, reg, 1,
-      [reg, value, &cache, &cache_valid, &packed, &packed_valid, packed_mask](
-          ModbusRegisterType, uint16_t, const std::vector<uint8_t> &data) {
+      [reg, value, &cache, &cache_valid, &packed, &packed_valid, packed_mask](ModbusRegisterType, uint16_t,
+                                                                              const std::vector<uint8_t> &data) {
         if (data.size() < 2) return;
         uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
         if (rb != value)

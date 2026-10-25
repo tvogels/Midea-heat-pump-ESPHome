@@ -23,3 +23,4 @@ __attribute__((format(printf, 3, 4))) inline void log_line(char level, const cha
 #define ESP_LOGD(tag, ...) log_line('D', tag, __VA_ARGS__)
 #define ESP_LOGI(tag, ...) log_line('I', tag, __VA_ARGS__)
 #define ESP_LOGW(tag, ...) log_line('W', tag, __VA_ARGS__)
+#define ESP_LOGE(tag, ...) log_line('E', tag, __VA_ARGS__)

@@ -3,67 +3,67 @@
 globals:
   - id: reg0
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg5
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg2
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg6
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg0_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg5_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg2_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg6_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg11
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg11_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg15
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg15_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg16
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg16_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg18
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg18_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
 
 select:
@@ -210,9 +210,13 @@ switch:
     optimistic: true
     lambda: "return (id(reg0) & 0x2) == 0x2; // Return bit 0x2 status"
     on_turn_on:
-      - lambda: hp::write_verified(heatpump, 16, "power zone 1", 1, id(reg16), id(reg16_valid), id(reg0), id(reg0_valid), 0x2);
+      - lambda: |-
+          hp::write_verified(heatpump, 16, "power zone 1", 1,
+                             id(reg16), id(reg16_valid), id(reg0), id(reg0_valid), 0x2);
     on_turn_off:
-      - lambda: hp::write_verified(heatpump, 16, "power zone 1", 0, id(reg16), id(reg16_valid), id(reg0), id(reg0_valid), 0x2);
+      - lambda: |-
+          hp::write_verified(heatpump, 16, "power zone 1", 0,
+                             id(reg16), id(reg16_valid), id(reg0), id(reg0_valid), 0x2);
 
   # Reg 0 bit 2 (read). Writes go to single-purpose reg 15 (0/1).
   - platform: template
@@ -225,9 +229,13 @@ switch:
     lambda: |-
       return (id(reg0) & 0x4) == 0x4;
     on_turn_on:
-      - lambda: hp::write_verified(heatpump, 15, "power DHW", 1, id(reg15), id(reg15_valid), id(reg0), id(reg0_valid), 0x4);
+      - lambda: |-
+          hp::write_verified(heatpump, 15, "power DHW", 1,
+                             id(reg15), id(reg15_valid), id(reg0), id(reg0_valid), 0x4);
     on_turn_off:
-      - lambda: hp::write_verified(heatpump, 15, "power DHW", 0, id(reg15), id(reg15_valid), id(reg0), id(reg0_valid), 0x4);
+      - lambda: |-
+          hp::write_verified(heatpump, 15, "power DHW", 0,
+                             id(reg15), id(reg15_valid), id(reg0), id(reg0_valid), 0x4);
 
   - platform: template
     name: "Disinfect"

@@ -3,7 +3,7 @@
 globals:
   - id: compressor_start_count
     type: int
-    restore_value: no
+    restore_value: false
     initial_value: '0'
 
 sensor:

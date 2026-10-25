@@ -1,10 +1,13 @@
-// Host unit test for include/packed_register.h and include/decoders.h.
+// Host unit test for include/packed_register.h and include/decoders.h, plus a
+// smoke test of include/t1s_lease.h (which also gets it compiled and linted).
 //
 //   g++ -std=c++17 -Wall -Wextra -Werror -I tests/stubs -I include tests/test_helpers.cpp -o test_helpers
 //   ./test_helpers
 #include "packed_register.h"
 #include "decoders.h"
+#include "t1s_lease.h"
 
+#include <cmath>
 #include <cstdio>
 #include <string>
 
@@ -12,12 +15,12 @@ using esphome::modbus_controller::ModbusController;
 
 static int failures = 0;
 
-#define CHECK(cond)                                                     \
-  do {                                                                  \
-    if (!(cond)) {                                                      \
-      std::printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond);       \
-      failures++;                                                       \
-    }                                                                   \
+#define CHECK(cond)                                               \
+  do {                                                            \
+    if (!(cond)) {                                                \
+      std::printf("FAIL %s:%d: %s\n", __FILE__, __LINE__, #cond); \
+      failures++;                                                 \
+    }                                                             \
   } while (0)
 
 static bool last_log_starts_with(const std::string &prefix) {
@@ -122,8 +125,9 @@ static void test_write_verified() {
   ctrl2.queue[1].on_data(esphome::modbus_controller::ModbusRegisterType::HOLDING, 11, {0x00, 0x21});
   CHECK(reg11 == 33 && reg2 == 0x1E21);
 
-  // Packed shadow not read yet: leave it alone.
-  reg2_valid = false;
+  // Packed shadow not read yet: leave it alone. (The read-back callback reads
+  // reg2_valid through its reference capture, which the analyzer can't follow.)
+  reg2_valid = false;  // NOLINT(clang-analyzer-deadcode.DeadStores)
   reg2 = 0;
   ctrl2.queue[1].on_data(esphome::modbus_controller::ModbusRegisterType::HOLDING, 11, {0x00, 0x22});
   CHECK(reg11 == 34 && reg2 == 0);
@@ -162,12 +166,36 @@ static void test_decoders() {
   CHECK(hp::active_state_code("Unknown: 4") == 99);
 }
 
+// The lease must stay idle and silent until asked, refuse targets above the
+// 40 °C cap, and start a takeover with a read (snapshot of reg 5), not a write.
+static void test_lease_smoke() {
+  ModbusController ctrl;
+  uint16_t reg0 = 0, reg2 = 30, reg5 = 0x1000;
+  bool reg2_valid = true, reg5_valid = true;
+  t1s_lease::T1sLease lease;
+  lease.setup(&ctrl, &reg0, &reg2, &reg5, &reg2_valid, &reg5_valid, 900);
+  lease.loop();
+  CHECK(!lease.active());
+  CHECK(ctrl.queue.empty());
+
+  lease.set_supervised(41, 600, NAN, NAN);
+  CHECK(!lease.active());
+  CHECK(ctrl.queue.empty());
+  CHECK(!lease.last_error().empty());
+
+  lease.set_supervised(30, 600, NAN, NAN);
+  CHECK(lease.active());
+  CHECK(ctrl.queue.size() == 1);
+  CHECK(!ctrl.queue[0].is_write && ctrl.queue[0].reg == 5);
+}
+
 int main() {
   test_place();
   test_capture();
   test_write_packed();
   test_write_verified();
   test_decoders();
+  test_lease_smoke();
   if (failures) {
     std::printf("%d check(s) failed\n", failures);
     return 1;

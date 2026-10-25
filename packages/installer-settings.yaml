@@ -3,67 +3,67 @@
 globals:
   - id: reg210
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg211
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg270
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg272
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg273
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg274
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg277
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg278
     type: uint16_t
-    restore_value: no
+    restore_value: false
     initial_value: '0'
   - id: reg210_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg211_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg270_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg272_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg273_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg274_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg277_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
   - id: reg278_valid
     type: bool
-    restore_value: no
+    restore_value: false
     initial_value: 'false'
 
 select:

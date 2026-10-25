@@ -8,6 +8,8 @@ on:
 
 env:
   ESPHOME_VERSION: "2026.6.5"
+  YAMLLINT_VERSION: "1.38.0"
+  LLVM_VERSION: "23.1.3"  # clang-format and clang-tidy
 
 jobs:
   helpers:
@@ -17,6 +19,21 @@ jobs:
       - uses: actions/checkout@v7
       - run: g++ -std=c++17 -Wall -Wextra -Werror -I tests/stubs -I include tests/test_helpers.cpp -o test_helpers
       - run: ./test_helpers
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.2
+      - name: yamllint
+        run: uvx --from "yamllint==$YAMLLINT_VERSION" yamllint --strict .
+      - name: clang-format
+        run: uvx --from "clang-format==$LLVM_VERSION" clang-format --dry-run -Werror $(git ls-files '*.h' '*.cpp')
+      - name: clang-tidy
+        run: |
+          uvx --from "clang-tidy==$LLVM_VERSION" clang-tidy --quiet tests/test_helpers.cpp \
+            -- -std=c++17 -I tests/stubs -I include
 
   firmware:
     name: Firmware (${{ matrix.variant }})
@@ -38,7 +55,7 @@ jobs:
         run: |
           if [ "${{ matrix.variant }}" = heatpump-lease ]; then
             # Same as heatpump.yaml with the opt-in lease package enabled.
-            sed 's|^  # - !include packages/t1s-lease.yaml$|  - !include packages/t1s-lease.yaml|' heatpump.yaml > heatpump-lease.tmp.yaml
+            sed 's|^  # \(- !include packages/t1s-lease.yaml\)$|  \1|' heatpump.yaml > heatpump-lease.tmp.yaml
             grep -q '^  - !include packages/t1s-lease.yaml$' heatpump-lease.tmp.yaml
             echo "CONFIG=heatpump-lease.tmp.yaml" >> "$GITHUB_ENV"
           else
