@@ -1,0 +1,855 @@
+# Status bits, load outputs, faults, versions and product code (regs 101, 124-131, 187-190, 198, 200, 612-613).
+
+sensor:
+  # Regs 124-127: fault codes, decoded by the text sensors below.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Current Fault"
+    id: "heatpump_current_fault"
+    icon: mdi:alert-circle
+    register_type: holding
+    entity_category: diagnostic
+    address: 124
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Fault 1"
+    id: "heatpump_fault_1"
+    icon: mdi:alert-circle
+    register_type: holding
+    entity_category: diagnostic
+    address: 125
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Fault 2"
+    id: "heatpump_fault_2"
+    icon: mdi:alert-circle
+    register_type: holding
+    entity_category: diagnostic
+    address: 126
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Fault 3"
+    id: "heatpump_fault_3"
+    icon: mdi:alert-circle
+    register_type: holding
+    entity_category: diagnostic
+    address: 127
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Software Version"
+    id: "heatpump_software_version"
+    icon: mdi:information
+    register_type: holding
+    address: 130
+    value_type: U_WORD
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Wired Controller Version Number"
+    id: "heatpump_wired_controller_version_number"
+    icon: mdi:information
+    register_type: holding
+    address: 131
+    value_type: U_WORD
+
+  - platform: template
+    name: "Active State Map"
+    id: "heatpump_active_state_map"
+    unit_of_measurement: ""
+    accuracy_decimals: 0
+    lambda: |-
+      static const std::map<std::string, int> status_map = {
+        {"Inactive", 0},
+        {"Heating", 1},
+        {"Cooling", 2},
+        {"DHW", 3},
+        {"Defrosting", 4},
+        {"Idle", 5},
+        {"Oil return", 6}
+      };
+
+      auto state_item = status_map.find(id(heatpump_active_state).state);
+      if (state_item != status_map.end()) {
+        return state_item->second; // Return integer value that matches the string value (Heating, Cooling, etc..)
+      } else {
+        return 99; // No mapping found
+      }
+
+  # Reg 188: extended fault list (companion to reg 124).
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Error Code (extended)"
+    id: "heatpump_error_code_extended"
+    icon: mdi:alert-circle
+    register_type: holding
+    address: 188
+    value_type: U_WORD
+    entity_category: diagnostic
+
+  # Regs 612/613: capability bitmasks, exposed raw.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Capability Bitmask 612"
+    id: "heatpump_capability_bitmask_612"
+    icon: mdi:format-list-bulleted-type
+    register_type: holding
+    address: 612
+    value_type: U_WORD
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Capability Bitmask 613"
+    id: "heatpump_capability_bitmask_613"
+    icon: mdi:format-list-bulleted-type
+    register_type: holding
+    address: 613
+    value_type: U_WORD
+    entity_category: diagnostic
+
+binary_sensor:
+  # Reg 128: status bits 1.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 1 Defrosting"
+    id: "heatpump_status_bit_1_defrosting"
+    icon: mdi:eye
+    register_type: holding
+    address: 128
+    bitmask: 0x2
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 1 Anti Freezing"
+    id: "heatpump_status_bit_1_anti_freezing"
+    icon: mdi:eye
+    register_type: holding
+    address: 128
+    bitmask: 0x4
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 1 Oil Return"
+    id: "heatpump_status_bit_1_oil_return"
+    icon: mdi:eye
+    register_type: holding
+    address: 128
+    bitmask: 0x8
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 1 Remote On-Off"
+    id: "heatpump_status_bit_1_remote_on_off"
+    icon: mdi:eye
+    register_type: holding
+    address: 128
+    bitmask: 0x10
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 1 Outdoor Unit Test Mode Mark"
+    id: "heatpump_status_bit_1_outdoor_unit_test_mode_mark"
+    icon: mdi:eye
+    register_type: holding
+    address: 128
+    bitmask: 0x20
+
+  # Reg 128 bits 6/7: V.E documents these as the room thermostat HT/CL inputs.
+  # (An earlier empirical note read them as master-mode mirrors; the ids still say so.)
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Room Thermostat Heat Demand (HT)"
+    id: "heatpump_status_bit_1_master_mode_heat"
+    icon: mdi:radiator
+    register_type: holding
+    address: 128
+    bitmask: 0x40
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Room Thermostat Cool Demand (CL)"
+    id: "heatpump_status_bit_1_master_mode_cool"
+    icon: mdi:snowflake
+    register_type: holding
+    address: 128
+    bitmask: 0x80
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 1 Anti Freezing Operation For Water Tank"
+    id: "heatpump_status_bit_1_anti_freezing_operation_for_water_tank"
+    icon: mdi:eye
+    register_type: holding
+    address: 128
+    bitmask: 0x200
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 1 SG"
+    id: "heatpump_status_bit_1_sg"
+    icon: mdi:eye
+    register_type: holding
+    address: 128
+    bitmask: 0x400
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 1 EUV"
+    id: "heatpump_status_bit_1_euv"
+    icon: mdi:eye
+    register_type: holding
+    address: 128
+    bitmask: 0x800
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 1 Request Serial Number Code"
+    id: "heatpump_status_bit_1_request_serial_number_code"
+    icon: mdi:eye
+    register_type: holding
+    address: 128
+    bitmask: 0x2000
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 1 Request Software Version"
+    id: "heatpump_status_bit_1_request_software_version"
+    icon: mdi:eye
+    register_type: holding
+    address: 128
+    bitmask: 0x4000
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 1 Request Operation Parameter"
+    id: "heatpump_status_bit_1_request_operation_parameter"
+    icon: mdi:eye
+    register_type: holding
+    address: 128
+    bitmask: 0x8000
+
+  # Reg 129: load outputs.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Load Output Internal Circulation Pump PUMP_I"
+    id: "heatpump_load_output_internal_circulation_pump_pump_i"
+    icon: mdi:pump
+    register_type: holding
+    address: 129
+    bitmask: 0x8
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Load Output SV 1"
+    id: "heatpump_load_output_sv1"
+    icon: mdi:eye
+    register_type: holding
+    address: 129
+    bitmask: 0x10
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Load Output SV 2"
+    id: "heatpump_load_output_sv2"
+    icon: mdi:head-question-outline
+    register_type: holding
+    address: 129
+    bitmask: 0x20
+
+  - id: "heatpump_load_output_heat4"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Load Output HEAT4 (Crankcase-Chassis Heater)"
+    icon: mdi:eye
+    register_type: holding
+    address: 129
+    bitmask: 0x400
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Load Output ALARM"
+    id: "heatpump_load_output_alarm"
+    icon: mdi:eye
+    register_type: holding
+    entity_category: diagnostic
+    address: 129
+    bitmask: 0x1000
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Load Output RUN"
+    id: "heatpump_load_output_run"
+    icon: mdi:eye
+    register_type: holding
+    address: 129
+    bitmask: 0x2000
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Load Output DEFROST"
+    id: "heatpump_load_output_defrost"
+    icon: mdi:eye
+    register_type: holding
+    address: 129
+    bitmask: 0x8000
+
+  # Reg 198: status bits.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status T1B Enabled"
+    id: "heatpump_status_t1b_enabled"
+    register_type: holding
+    address: 198
+    bitmask: 0x1000
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status T1 Enabled"
+    id: "heatpump_status_t1_enabled"
+    register_type: holding
+    address: 198
+    bitmask: 0x0200
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status Energy Metering Enabled"
+    id: "heatpump_status_energy_metering_enabled"
+    register_type: holding
+    address: 198
+    bitmask: 0x0100
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status DHW Operation"
+    id: "heatpump_status_dhw_operation"
+    register_type: holding
+    address: 198
+    bitmask: 0x0020
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status Heating Operation"
+    id: "heatpump_status_heating_operation"
+    register_type: holding
+    address: 198
+    bitmask: 0x0010
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status Cooling Operation"
+    id: "heatpump_status_cooling_operation"
+    register_type: holding
+    address: 198
+    bitmask: 0x0008
+    entity_category: diagnostic
+
+  # Reg 189 bit 8: 0 = 1 °C resolution, 1 = 0.1 °C (value x10). Affects registers
+  # marked (1)/(2) in V.E; the scaling in this config assumes 0.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 2 Temperature Precision (0=1°C, 1=0.1°C)"
+    id: "heatpump_status_bit_2_temperature_precision"
+    icon: mdi:decimal-comma
+    register_type: holding
+    address: 189
+    bitmask: 0x100
+    entity_category: diagnostic
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Status BIT 2 Power Phase"
+    id: "heatpump_status_bit_2_power_phase"
+    icon: mdi:sine-wave
+    register_type: holding
+    address: 189
+    bitmask: 0x80
+    entity_category: diagnostic
+
+text_sensor:
+  - platform: template
+    name: "Active State"
+    id: "heatpump_active_state"
+    icon: mdi:power
+    entity_category: "diagnostic"
+    lambda: |-
+      if (id(heatpump_operating_mode).state != "OFF") {
+        if (id(heatpump_load_output_run).state) {
+          // The heat pump is on
+          if (id(heatpump_status_bit_1_defrosting).state) {
+            return {"Defrosting"};
+          } else if (id(heatpump_status_bit_1_oil_return).state) {
+            return {"Oil return"};
+          } else if (id(heatpump_load_output_sv1).state) {
+            return {"DHW"};
+          } else {
+            // Return the state from "Operating Mode", which can be Cooling or Heating
+            return id(heatpump_operating_mode).state;
+          }
+        } else {
+          // The heat pumps operating mode is on (not OFF), but is not "Heating", "Cooling", or "DHW".
+          // In this case the heat pump is Idle, which is for example the case when it is preparing for a DHW
+          // run or between "Heating" sessions
+          return {"Idle"};
+        }
+      } else {
+        // The heat pump is off
+        return {"Inactive"};
+      }
+
+  - platform: template
+    name: "Current Fault Error Code"
+    id: "heatpump_current_fault_error_code"
+    icon: "mdi:alert-circle"
+    lambda: |-
+      int current_fault = id(heatpump_current_fault).state;
+
+      // ESP_LOGI("main", "Current fault: %d", current_fault);
+
+      if (current_fault >= 0 && current_fault <= 143) {
+        return std::to_string(current_fault);
+      } else {
+        return {"Unknown"};
+      }
+    filters:
+      - map:
+          - 0 -> OK
+          - 1 -> E0
+          - 2 -> E1
+          - 3 -> E2
+          - 4 -> E3
+          - 5 -> E4
+          - 6 -> E5
+          - 7 -> E6
+          - 8 -> E7
+          - 9 -> E8
+          - 10 -> E9
+          - 11 -> EA
+          - 12 -> Eb
+          - 13 -> Ec
+          - 14 -> Ed
+          - 15 -> EE
+          - 20 -> P0
+          - 21 -> P1
+          - 23 -> P3
+          - 24 -> P4
+          - 25 -> P5
+          - 26 -> P6
+          - 31 -> Pb
+          - 33 -> Pd
+          - 38 -> PP
+          - 39 -> H0
+          - 40 -> H1
+          - 41 -> H2
+          - 42 -> H3
+          - 43 -> H4
+          - 44 -> H5
+          - 45 -> H6
+          - 46 -> H7
+          - 47 -> H8
+          - 48 -> H9
+          - 49 -> HA
+          - 50 -> Hb
+          - 52 -> Hd
+          - 53 -> HE
+          - 54 -> HF
+          - 55 -> HH
+          - 57 -> HP
+          - 65 -> C7
+          - 112 -> bH
+          - 116 -> F1
+          - 134 -> L0
+          - 135 -> L1
+          - 136 -> L2
+          - 138 -> L4
+          - 139 -> L5
+          - 141 -> L7
+          - 142 -> L8
+          - 143 -> L9
+
+  - platform: template
+    name: "Current Fault Error Code Description"
+    id: "heatpump_current_fault_error_code_description"
+    icon: "mdi:alert-circle"
+    lambda: |-
+      int current_fault = id(heatpump_current_fault).state;
+
+      // ESP_LOGI("main", "Current fault: %d", current_fault);
+
+      if (current_fault >= 0 && current_fault <= 143) {
+        return std::to_string(current_fault);
+      } else {
+        return {"Unknown"};
+      }
+    filters:
+      - map:
+          - 0 -> OK
+          - 1 -> Water flow fault(E8 displayed 3 times)
+          - 2 -> Phase loss or neutral wire and live wire are connected reversely(only for three phase unit)
+          - 3 -> Communication fault between controller and hydraulic module
+          - 4 -> Final outlet water temperature sensor(T1) fault
+          - 5 -> Water tank temperature sensor(T5) fault
+          - 6 -> The condenser outlet refrigerant temperature sensor(T3) fault
+          - 7 -> The ambient temperature sensor(T4) fault
+          - 8 -> Buffer tank up temperature sensor(Tbt1) fault
+          - 9 -> Water flow failure
+          - 10 -> Suction temperature sensor (Th) fault
+          - 11 -> Discharge temperature sensor (Tp) fault
+          - 12 -> Solar temperature sensor(Tsolar) fault
+          - 13 -> Buffer tank low temperature sensor(Tbt2) fault
+          - 14 -> Inlet water temperature sensor(Tw_in) malfunction
+          - 15 -> Hydraulic module EEprom failure
+          - 20 -> Low pressure switch protection
+          - 21 -> High pressure switch protection
+          - 23 -> Compressor overcurrent protection
+          - 24 -> High discharge temperature protection
+          - 25 -> |Tw_out - Tw_in| value too big protection
+          - 26 -> Inverter module protection
+          - 31 -> Anti-freeze mode
+          - 33 -> High temperature protection of refrigerant outlet temperature of condenser
+          - 38 -> Tw_out - Tw_in unusual protection
+          - 39 -> Communication fault between main board PCB B and main control board of hydraulic module
+          - 40 -> Communication fault between inverter module PCB A and main control board PCB B
+          - 41 -> Refrigerant liquid temperature sensor(T2) fault
+          - 42 -> Refrigerant gas temperature sensor(T2B) fault
+          - 43 -> Three times P6(L0/L1) protection
+          - 44 -> Room temo. sensor (Ta) fault
+          - 45 -> DC fan motor fault
+          - 46 -> Voltage protection
+          - 47 -> Pressure sensor fault
+          - 48 -> Outlet water for zone 2 temperature sensor(Tw2) fault
+          - 49 -> Outlet water temperature sensor(Tw_out) fault
+          - 50 -> 3 times PP protection and Tw_out<7℃
+          - 52 -> Communication fault between hydraulic module parallel
+          - 53 -> Communication error between main board and thermostat transfer board
+          - 54 -> Inverter module board EE PROM fault
+          - 55 -> H6 display 10 times in 2 hours
+          - 57 -> Low pressure protection (Pe<0.6) occurred 3 times in 1 hour
+          - 65 -> Transducer module temperature too high protection
+          - 112 -> PED PCB fault
+          - 116 -> Low DC generatrix voltage protection
+          - 134 -> Module protection
+          - 135 -> DC generatrix low voltage protection
+          - 136 -> DC generatrix high voltage protection
+          - 138 -> MCE fault
+          - 139 -> Zero speed protection
+          - 141 -> Phase sequence fault
+          - 142 -> Speed difference > 15Hz protection between the front and the back clock
+          - 143 -> Speed difference > 15Hz protection between the real and the setting speed
+
+  - platform: template
+    name: "Fault 1 Error Code"
+    id: "heatpump_fault_1_error_code"
+    icon: "mdi:alert-circle"
+    lambda: |-
+      int fault_one = id(heatpump_fault_1).state;
+
+      if (fault_one >= 0 && fault_one <= 143) {
+        return std::to_string(fault_one);
+      } else {
+        return {"Unknown"};
+      }
+    filters:
+      - map:
+          - 0 -> OK
+          - 1 -> E0
+          - 2 -> E1
+          - 3 -> E2
+          - 4 -> E3
+          - 5 -> E4
+          - 6 -> E5
+          - 7 -> E6
+          - 8 -> E7
+          - 9 -> E8
+          - 10 -> E9
+          - 11 -> EA
+          - 12 -> Eb
+          - 13 -> Ec
+          - 14 -> Ed
+          - 15 -> EE
+          - 20 -> P0
+          - 21 -> P1
+          - 23 -> P3
+          - 24 -> P4
+          - 25 -> P5
+          - 26 -> P6
+          - 31 -> Pb
+          - 33 -> Pd
+          - 38 -> PP
+          - 39 -> H0
+          - 40 -> H1
+          - 41 -> H2
+          - 42 -> H3
+          - 43 -> H4
+          - 44 -> H5
+          - 45 -> H6
+          - 46 -> H7
+          - 47 -> H8
+          - 48 -> H9
+          - 49 -> HA
+          - 50 -> Hb
+          - 52 -> Hd
+          - 53 -> HE
+          - 54 -> HF
+          - 55 -> HH
+          - 57 -> HP
+          - 65 -> C7
+          - 112 -> bH
+          - 116 -> F1
+          - 134 -> L0
+          - 135 -> L1
+          - 136 -> L2
+          - 138 -> L4
+          - 139 -> L5
+          - 141 -> L7
+          - 142 -> L8
+          - 143 -> L9
+
+  - platform: template
+    name: "Fault 2 Error Code"
+    id: "heatpump_fault_2_error_code"
+    icon: "mdi:alert-circle"
+    lambda: |-
+      int fault_two = id(heatpump_fault_2).state;
+
+      if (fault_two >= 0 && fault_two <= 143) {
+        return std::to_string(fault_two);
+      } else {
+        return {"Unknown"};
+      }
+    filters:
+      - map:
+          - 0 -> OK
+          - 1 -> E0
+          - 2 -> E1
+          - 3 -> E2
+          - 4 -> E3
+          - 5 -> E4
+          - 6 -> E5
+          - 7 -> E6
+          - 8 -> E7
+          - 9 -> E8
+          - 10 -> E9
+          - 11 -> EA
+          - 12 -> Eb
+          - 13 -> Ec
+          - 14 -> Ed
+          - 15 -> EE
+          - 20 -> P0
+          - 21 -> P1
+          - 23 -> P3
+          - 24 -> P4
+          - 25 -> P5
+          - 26 -> P6
+          - 31 -> Pb
+          - 33 -> Pd
+          - 38 -> PP
+          - 39 -> H0
+          - 40 -> H1
+          - 41 -> H2
+          - 42 -> H3
+          - 43 -> H4
+          - 44 -> H5
+          - 45 -> H6
+          - 46 -> H7
+          - 47 -> H8
+          - 48 -> H9
+          - 49 -> HA
+          - 50 -> Hb
+          - 52 -> Hd
+          - 53 -> HE
+          - 54 -> HF
+          - 55 -> HH
+          - 57 -> HP
+          - 65 -> C7
+          - 112 -> bH
+          - 116 -> F1
+          - 134 -> L0
+          - 135 -> L1
+          - 136 -> L2
+          - 138 -> L4
+          - 139 -> L5
+          - 141 -> L7
+          - 142 -> L8
+          - 143 -> L9
+
+  - platform: template
+    name: "Fault 3 Error Code"
+    id: "heatpump_fault_3_error_code"
+    icon: "mdi:alert-circle"
+    lambda: |-
+      int fault_three = id(heatpump_fault_3).state;
+
+      if (fault_three >= 0 && fault_three <= 143) {
+        return std::to_string(fault_three);
+      } else {
+        return {"Unknown"};
+      }
+    filters:
+      - map:
+          - 0 -> OK
+          - 1 -> E0
+          - 2 -> E1
+          - 3 -> E2
+          - 4 -> E3
+          - 5 -> E4
+          - 6 -> E5
+          - 7 -> E6
+          - 8 -> E7
+          - 9 -> E8
+          - 10 -> E9
+          - 11 -> EA
+          - 12 -> Eb
+          - 13 -> Ec
+          - 14 -> Ed
+          - 15 -> EE
+          - 20 -> P0
+          - 21 -> P1
+          - 23 -> P3
+          - 24 -> P4
+          - 25 -> P5
+          - 26 -> P6
+          - 31 -> Pb
+          - 33 -> Pd
+          - 38 -> PP
+          - 39 -> H0
+          - 40 -> H1
+          - 41 -> H2
+          - 42 -> H3
+          - 43 -> H4
+          - 44 -> H5
+          - 45 -> H6
+          - 46 -> H7
+          - 47 -> H8
+          - 48 -> H9
+          - 49 -> HA
+          - 50 -> Hb
+          - 52 -> Hd
+          - 53 -> HE
+          - 54 -> HF
+          - 55 -> HH
+          - 57 -> HP
+          - 65 -> C7
+          - 112 -> bH
+          - 116 -> F1
+          - 134 -> L0
+          - 135 -> L1
+          - 136 -> L2
+          - 138 -> L4
+          - 139 -> L5
+          - 141 -> L7
+          - 142 -> L8
+          - 143 -> L9
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Operating Mode"
+    id: "heatpump_operating_mode"
+    icon: mdi:state-machine
+    register_type: holding
+    address: 101
+    response_size: 2
+    lambda: |-
+      int idx = item->offset;
+      uint16_t rawdata = (uint16_t(data[idx]) << 8) + uint16_t(data[idx + 1]);
+      std::string output = "Unknown: ";
+      output += to_string(rawdata);
+      if (rawdata == 0) output = "OFF";
+      else if (rawdata == 2) output = "Cooling";
+      else if (rawdata == 3) output = "Heating";
+      else if (rawdata == 5) output = "DHW Heating";
+      // ESP_LOGD("Register 101","Operating mode %s (%d)", output.c_str(), rawdata);
+      return output;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Heat Pump Operation Mode"
+    id: "heatpump_heat_pump_operation_mode"
+    icon: mdi:heat-pump
+    register_type: holding
+    address: 199
+    lambda: |-
+      uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+      switch (value) {
+        case 0: return std::string("Off");
+        case 2: return std::string("Cooling");
+        case 3: return std::string("Heating");
+        case 5: return std::string("DHW");
+        default: return std::string("Invalid");
+      }
+      return x;
+
+  # Reg 187: Modbus protocol version (46 = V4.6).
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Modbus Protocol Version"
+    id: "heatpump_modbus_protocol_version"
+    icon: mdi:protocol
+    register_type: holding
+    address: 187
+    lambda: |-
+      uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+      if (value == 0 || value == 0x7FFF) return std::string("Unknown");
+      char buf[16];
+      snprintf(buf, sizeof(buf), "V%d.%d", value / 10, value % 10);
+      return std::string(buf);
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Hydraulic Module Sub-Model"
+    id: "heatpump_hydraulic_module_submodel"
+    register_type: holding
+    address: 190
+    lambda: |-
+      uint16_t value = modbus_controller::word_from_hex_str(x, 0);
+      switch (value) {
+        case 0: return std::string("R32-P");
+        case 1: return std::string("Aqua");
+        case 2: return std::string("C-R32-P");
+        case 3: return std::string("R290-A");
+        case 4: return std::string("R290-N");
+        case 5: return std::string("C-R290-A");
+        case 6: return std::string("C-R290-N");
+        case 7: return std::string("R32-A");
+        case 8: return std::string("C-R32-A");
+        case 9: return std::string("R290-M");
+        case 10: return std::string("R32-H");
+        default: return std::string("Unknown");
+      }
+      return x;
+
+  # Reg 200: product code (read-only).
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Home Appliance Product Code"
+    id: "heatpump_home_appliance_product_code"
+    icon: "mdi:information-box-outline"
+    register_type: holding
+    response_size: 2
+    raw_encode: HEXBYTES
+    address: 200
+    lambda: |-
+      int idx = item->offset;
+      std::string z = "";
+      uint16_t rawdata = (uint16_t(data[idx]) << 8) + uint16_t(data[idx + 1]);
+      // ESP_LOGD("Register 200", "The home appliance product code is 0x%x rawdata ", rawdata);
+      if (((rawdata & 0x00F0) >> 4) == 4) {
+        z = "4";
+      } else {
+        z = std::to_string((rawdata & 0x00F0) >> 4);
+      }
+      return {z};

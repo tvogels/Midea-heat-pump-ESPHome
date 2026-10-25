@@ -1,0 +1,818 @@
+# Day-to-day controls: power, mode, setpoints, curve selection (regs 0-18).
+
+globals:
+  - id: unmasked_value_register_0
+    type: uint16_t
+    restore_value: no
+    initial_value: '0'
+  - id: unmasked_value_register_5
+    type: uint16_t
+    restore_value: no
+    initial_value: '0'
+  - id: unmasked_value_water_temperature_t1s
+    type: uint16_t
+    restore_value: no
+    initial_value: '0'
+  - id: unmasked_curve_selection
+    type: uint16_t
+    restore_value: no
+    initial_value: '0'
+  - id: unmasked_value_register_0_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_register_5_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_value_water_temperature_t1s_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: unmasked_curve_selection_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: reg11_value
+    type: uint16_t
+    restore_value: no
+    initial_value: '0'
+  - id: reg11_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: reg15_value
+    type: uint16_t
+    restore_value: no
+    initial_value: '0'
+  - id: reg15_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: reg16_value
+    type: uint16_t
+    restore_value: no
+    initial_value: '0'
+  - id: reg16_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+  - id: reg18_value
+    type: uint16_t
+    restore_value: no
+    initial_value: '0'
+  - id: reg18_valid
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+select:
+  # Reg 1. V.E: 1 = Auto, 2 = Cool, 3 = Heat.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Operational Mode"
+    id: "heatpump_operational_mode"
+    icon: "mdi:fan"
+    address: 1
+    value_type: U_WORD
+    optimistic: true
+    optionsmap:
+      "Heat": 3
+      "Cool": 2
+      "Auto": 1
+
+  - platform: template
+    name: "Silent Mode Level"
+    id: "heatpump_silent_mode_level"
+    icon: mdi:volume-medium
+    entity_category: config
+    options:
+      - "Level 1"
+      - "Level 2"
+    lambda: |-
+      if ((id(unmasked_value_register_5) & 0x80) == 0x80) {
+        return {"Level 2"};
+      } else {
+        return {"Level 1"};
+      }
+    set_action:
+      - lambda: |-
+          uint16_t checked_bit = 0x80;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          if (x == "Level 2") {
+            new_value |= checked_bit;
+          } else {
+            new_value &= ~checked_bit;
+          }
+          if (new_value != id(unmasked_value_register_5)) {
+            // ESP_LOGD("unmasked_value_register_5", "Set silent_mode_level 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
+            id(unmasked_value_register_5) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+          // Update the UI immediate insteafd of waiting for the next poll
+          id(heatpump_silent_mode_level).publish_state(x);
+
+number:
+  # Reg 2 low byte (read). Writes go to single-purpose reg 11.
+  # SAFETY: zone 1 is underfloor heating in a cement screed. Max water setpoint 40 °C.
+  # Screed degrades above ~45-50 °C, floor coverings above ~35-40 °C. Do not raise
+  # without checking floor covering, screed type and EN 1264-2 / NEN 1068 surface limits.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Set Water Temperature T1S Zone 1"
+    id: "heatpump_set_water_temperature_t1s_zone_1"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 2
+    value_type: U_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    entity_category: config
+    min_value: 5
+    max_value: 40
+    mode: slider
+    lambda: |-
+      // Update the global var unmasked_value_water_temperature_t1s
+      id(unmasked_value_water_temperature_t1s) = x;
+      id(unmasked_value_water_temperature_t1s_valid) = true;  // Shadow now holds a real value read from the heatpump
+
+      // ESP_LOGI("","unmasked_value_water_temperature_t1s: %d",id(unmasked_value_water_temperature_t1s));
+      uint8_t value_bytes[2];
+      uint16_t value = x;
+      value_bytes[0] = value >> 8;     // high byte (zone 2)
+      value_bytes[1] = value & 0x00FF; // low byte (zone 1)
+      // ESP_LOGI("Register 2Low","Zone 1 is %d    Zone 2 is %d", value_bytes[1], value_bytes[0]);
+      return value_bytes[1];
+    write_lambda: |-
+      if (id(reg11_valid) && id(reg11_value) == (uint16_t) x) {
+        ESP_LOGD("single_reg", "reg 11 already %u, no write", (unsigned) x);
+        return {};
+      }
+      uint16_t reg = 11;
+      if (!id(reg11_valid)) {
+        ESP_LOGW("single_reg", "Refusing write to reg %u (T1S zone 1): reg %u not yet read from heatpump", reg, reg);
+        return {};
+      }
+      uint16_t value = (uint16_t) x;
+      ESP_LOGI("single_reg", "Write reg %u (T1S zone 1) = %u", reg, value);
+      heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, reg, value));
+      // Read back the same register after the write (queued behind it).
+      heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_read_command(
+          heatpump, esphome::modbus_controller::ModbusRegisterType::HOLDING, reg, 1,
+          [value](esphome::modbus_controller::ModbusRegisterType, uint16_t, const std::vector<uint8_t> &data) {
+            if (data.size() < 2) return;
+            uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
+            if (rb != value) ESP_LOGW("single_reg", "Read-back reg 11 = %u, expected %u", rb, value);
+            else ESP_LOGI("single_reg", "Read-back reg 11 = %u OK", rb);
+            id(reg11_value) = rb;
+            id(reg11_valid) = true;
+            // Reg 2 low byte mirrors reg 11: keep the packed shadow consistent until the next poll.
+            if (id(unmasked_value_water_temperature_t1s_valid))
+              id(unmasked_value_water_temperature_t1s) = (id(unmasked_value_water_temperature_t1s) & 0xFF00) | (rb & 0x00FF);
+          }));
+      return {};
+
+  # Reg 3, raw = °C x2.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Air Temperature Ts"
+    id: "heatpump_air_temperature_ts"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 3
+    value_type: U_WORD
+    unit_of_measurement: "°C"
+    entity_category: config
+    device_class: temperature
+    min_value: 17
+    max_value: 30
+    step: 0.5
+    mode: slider
+    lambda: |-
+      return x * 0.5;
+    write_lambda: |-
+      return x * 2.0;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Set DHW Tank Temperature T5s"
+    id: "heatpump_set_dhw_tank_temperature_t5s"
+    icon: mdi:temperature-celsius
+    register_type: holding
+    address: 4
+    value_type: U_WORD
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    entity_category: config
+    min_value: 20
+    max_value: 65
+    mode: slider
+
+  # Reg 6 low byte (read). Writes go to single-purpose reg 18.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Weather Compensation Curve Zone 1"
+    id: "heatpump_weather_compensation_curve_zone_1"
+    icon: mdi:eye
+    register_type: holding
+    address: 6
+    value_type: U_WORD
+    entity_category: config
+    min_value: 1
+    max_value: 9
+    mode: slider
+    lambda: |-
+      // Update the global var unmasked_curve_selection
+      id(unmasked_curve_selection) = x;
+      id(unmasked_curve_selection_valid) = true;  // Shadow now holds a real value read from the heatpump
+
+      // ESP_LOGI("","unmasked_curve_selection: %d",id(unmasked_curve_selection));
+
+      uint8_t value_bytes[2];
+      uint16_t value = x;
+      value_bytes[0] = value >> 8;     // high byte (zone 2)
+      value_bytes[1] = value & 0x00FF; // low byte (zone 1)
+
+      // ESP_LOGI("","Zone 1 is %d", value_bytes[1]);
+      // ESP_LOGI("","Zone 2 is %d", value_bytes[0]);
+
+      return value_bytes[1];
+    write_lambda: |-
+      if (id(reg18_valid) && id(reg18_value) == (uint16_t) x) {
+        ESP_LOGD("single_reg", "reg 18 already %u, no write", (unsigned) x);
+        return {};
+      }
+      uint16_t reg = 18;
+      if (!id(reg18_valid)) {
+        ESP_LOGW("single_reg", "Refusing write to reg %u (curve zone 1): reg %u not yet read from heatpump", reg, reg);
+        return {};
+      }
+      uint16_t value = (uint16_t) x;
+      ESP_LOGI("single_reg", "Write reg %u (curve zone 1) = %u", reg, value);
+      heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, reg, value));
+      // Read back the same register after the write (queued behind it).
+      heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_read_command(
+          heatpump, esphome::modbus_controller::ModbusRegisterType::HOLDING, reg, 1,
+          [value](esphome::modbus_controller::ModbusRegisterType, uint16_t, const std::vector<uint8_t> &data) {
+            if (data.size() < 2) return;
+            uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
+            if (rb != value) ESP_LOGW("single_reg", "Read-back reg 18 = %u, expected %u", rb, value);
+            else ESP_LOGI("single_reg", "Read-back reg 18 = %u OK", rb);
+            id(reg18_value) = rb;
+            id(reg18_valid) = true;
+            // Reg 6 low byte mirrors reg 18.
+            if (id(unmasked_curve_selection_valid))
+              id(unmasked_curve_selection) = (id(unmasked_curve_selection) & 0xFF00) | (rb & 0x00FF);
+          }));
+      return {};
+
+switch:
+  # Reg 0 bit 0. When on, the wired controller's room sensor decides when the
+  # heat pump powers on/off.
+  - platform: template
+    name: "Room Temperature Control"
+    id: "heatpump_room_temperature_control"
+    icon: mdi:eye
+    entity_category: config
+    restore_mode: DISABLED
+    optimistic: true
+    lambda: "return (id(unmasked_value_register_0) & 0x1) == 0x1;"
+    on_turn_on:
+      - lambda: |-
+          uint16_t checked_bit = 0x1;
+          if (!id(unmasked_value_register_0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
+          new_value &= ~checked_bit;                           // Clear and set
+          new_value += checked_bit;
+          if ((new_value) != id(unmasked_value_register_0)) {
+            // ESP_LOGD("unmasked_value_register_0", "Set option to on power_air_conditioner_zone_1 0x%x -> 0x%x", id(unmasked_value_register_0), new_value);
+            id(unmasked_value_register_0) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 0x0, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+    on_turn_off:
+      - lambda: |-
+          uint16_t checked_bit = 0x1;
+          if (!id(unmasked_value_register_0_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_0 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_0);  // The original unmasked value
+          new_value &= ~checked_bit;                           // Clear and set
+          if ((new_value) != id(unmasked_value_register_0)) {
+            // ESP_LOGD("unmasked_value_register_0", "Set option to off power_air_conditioner_zone_1 0x%x -> 0x%x", id(unmasked_value_register_0), new_value);
+            id(unmasked_value_register_0) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 0x0, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+
+  # Reg 0 bit 1 (read). Writes go to single-purpose reg 16 (0/1).
+  # When on, the zone 1 target water temperature decides when the heat pump powers on/off.
+  # The dry-contact room thermostat on this install gates this bit.
+  - platform: template
+    name: "Water Flow Temperature Control Zone 1"
+    id: "heatpump_water_flow_temperature_control_zone_1"
+    icon: mdi:eye
+    entity_category: config
+    restore_mode: DISABLED
+    optimistic: true
+    lambda: "return (id(unmasked_value_register_0) & 0x2) == 0x2; // Return bit 0x2 status"
+    on_turn_on:
+      - lambda: |-
+          if (id(reg16_valid) && id(reg16_value) == 1) {
+            ESP_LOGD("single_reg", "reg 16 already 1, no write");
+            return;
+          }
+          uint16_t reg = 16;
+          if (!id(reg16_valid)) {
+            ESP_LOGW("single_reg", "Refusing write to reg %u (power zone 1): reg %u not yet read from heatpump", reg, reg);
+            return;
+          }
+          uint16_t value = 1;
+          ESP_LOGI("single_reg", "Write reg %u (power zone 1) = %u", reg, value);
+          heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, reg, value));
+          // Read back the same register after the write (queued behind it).
+          heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_read_command(
+              heatpump, esphome::modbus_controller::ModbusRegisterType::HOLDING, reg, 1,
+              [value](esphome::modbus_controller::ModbusRegisterType, uint16_t, const std::vector<uint8_t> &data) {
+                if (data.size() < 2) return;
+                uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
+                if (rb != value) ESP_LOGW("single_reg", "Read-back reg 16 = %u, expected %u", rb, value);
+                else ESP_LOGI("single_reg", "Read-back reg 16 = %u OK", rb);
+                id(reg16_value) = rb;
+                id(reg16_valid) = true;
+                // Reg 0 bit 0x2 mirrors this register: keep the packed shadow consistent until the next poll.
+                if (id(unmasked_value_register_0_valid)) {
+                  if (rb) id(unmasked_value_register_0) |= 0x2;
+                  else id(unmasked_value_register_0) &= ~0x2;
+                }
+              }));
+    on_turn_off:
+      - lambda: |-
+          if (id(reg16_valid) && id(reg16_value) == 0) {
+            ESP_LOGD("single_reg", "reg 16 already 0, no write");
+            return;
+          }
+          uint16_t reg = 16;
+          if (!id(reg16_valid)) {
+            ESP_LOGW("single_reg", "Refusing write to reg %u (power zone 1): reg %u not yet read from heatpump", reg, reg);
+            return;
+          }
+          uint16_t value = 0;
+          ESP_LOGI("single_reg", "Write reg %u (power zone 1) = %u", reg, value);
+          heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, reg, value));
+          // Read back the same register after the write (queued behind it).
+          heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_read_command(
+              heatpump, esphome::modbus_controller::ModbusRegisterType::HOLDING, reg, 1,
+              [value](esphome::modbus_controller::ModbusRegisterType, uint16_t, const std::vector<uint8_t> &data) {
+                if (data.size() < 2) return;
+                uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
+                if (rb != value) ESP_LOGW("single_reg", "Read-back reg 16 = %u, expected %u", rb, value);
+                else ESP_LOGI("single_reg", "Read-back reg 16 = %u OK", rb);
+                id(reg16_value) = rb;
+                id(reg16_valid) = true;
+                // Reg 0 bit 0x2 mirrors this register: keep the packed shadow consistent until the next poll.
+                if (id(unmasked_value_register_0_valid)) {
+                  if (rb) id(unmasked_value_register_0) |= 0x2;
+                  else id(unmasked_value_register_0) &= ~0x2;
+                }
+              }));
+
+  # Reg 0 bit 2 (read). Writes go to single-purpose reg 15 (0/1).
+  - platform: template
+    name: "Power DHW T5S"
+    id: "heatpump_power_dhw_t5s"
+    icon: mdi:eye
+    entity_category: config
+    restore_mode: DISABLED
+    optimistic: true
+    lambda: |-
+      return (id(unmasked_value_register_0) & 0x4) == 0x4;
+    on_turn_on:
+      - lambda: |-
+          if (id(reg15_valid) && id(reg15_value) == 1) {
+            ESP_LOGD("single_reg", "reg 15 already 1, no write");
+            return;
+          }
+          uint16_t reg = 15;
+          if (!id(reg15_valid)) {
+            ESP_LOGW("single_reg", "Refusing write to reg %u (power DHW): reg %u not yet read from heatpump", reg, reg);
+            return;
+          }
+          uint16_t value = 1;
+          ESP_LOGI("single_reg", "Write reg %u (power DHW) = %u", reg, value);
+          heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, reg, value));
+          // Read back the same register after the write (queued behind it).
+          heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_read_command(
+              heatpump, esphome::modbus_controller::ModbusRegisterType::HOLDING, reg, 1,
+              [value](esphome::modbus_controller::ModbusRegisterType, uint16_t, const std::vector<uint8_t> &data) {
+                if (data.size() < 2) return;
+                uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
+                if (rb != value) ESP_LOGW("single_reg", "Read-back reg 15 = %u, expected %u", rb, value);
+                else ESP_LOGI("single_reg", "Read-back reg 15 = %u OK", rb);
+                id(reg15_value) = rb;
+                id(reg15_valid) = true;
+                // Reg 0 bit 0x4 mirrors this register: keep the packed shadow consistent until the next poll.
+                if (id(unmasked_value_register_0_valid)) {
+                  if (rb) id(unmasked_value_register_0) |= 0x4;
+                  else id(unmasked_value_register_0) &= ~0x4;
+                }
+              }));
+    on_turn_off:
+      - lambda: |-
+          if (id(reg15_valid) && id(reg15_value) == 0) {
+            ESP_LOGD("single_reg", "reg 15 already 0, no write");
+            return;
+          }
+          uint16_t reg = 15;
+          if (!id(reg15_valid)) {
+            ESP_LOGW("single_reg", "Refusing write to reg %u (power DHW): reg %u not yet read from heatpump", reg, reg);
+            return;
+          }
+          uint16_t value = 0;
+          ESP_LOGI("single_reg", "Write reg %u (power DHW) = %u", reg, value);
+          heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, reg, value));
+          // Read back the same register after the write (queued behind it).
+          heatpump->queue_command(esphome::modbus_controller::ModbusCommandItem::create_read_command(
+              heatpump, esphome::modbus_controller::ModbusRegisterType::HOLDING, reg, 1,
+              [value](esphome::modbus_controller::ModbusRegisterType, uint16_t, const std::vector<uint8_t> &data) {
+                if (data.size() < 2) return;
+                uint16_t rb = (uint16_t(data[0]) << 8) | data[1];
+                if (rb != value) ESP_LOGW("single_reg", "Read-back reg 15 = %u, expected %u", rb, value);
+                else ESP_LOGI("single_reg", "Read-back reg 15 = %u OK", rb);
+                id(reg15_value) = rb;
+                id(reg15_valid) = true;
+                // Reg 0 bit 0x4 mirrors this register: keep the packed shadow consistent until the next poll.
+                if (id(unmasked_value_register_0_valid)) {
+                  if (rb) id(unmasked_value_register_0) |= 0x4;
+                  else id(unmasked_value_register_0) &= ~0x4;
+                }
+              }));
+
+  - platform: template
+    name: "Disinfect"
+    id: "heatpump_disinfect"
+    icon: mdi:eye
+    entity_category: config
+    restore_mode: DISABLED
+    optimistic: true
+    lambda: "return (id(unmasked_value_register_5) & 0x10) == 0x10; // Return status bit 4"
+    on_turn_on:
+      - lambda: |-
+          uint16_t checked_bit = 0x10;                         // Bit to change
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          new_value &= ~checked_bit;                           // Clear and set
+          new_value += checked_bit;
+          if ((new_value) != id(unmasked_value_register_5)) {
+            // ESP_LOGD("unmasked_value_register_5", "Set option to on f_s_disinfect 0x%x -> 0x%xs", id(unmasked_value_register_5), new_value);
+            id(unmasked_value_register_5) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+    on_turn_off:
+      - lambda: |-
+          uint16_t checked_bit = 0x10;                         // Bit to change
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          new_value &= ~checked_bit;                           // Clear and set
+          if ((new_value) != id(unmasked_value_register_5)) {
+            // ESP_LOGD("unmasked_value_register_5", "Set option to off f_s_disinfect 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
+            id(unmasked_value_register_5) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+
+  - platform: template
+    name: "Silent Mode"
+    id: "heatpump_silent_mode"
+    icon: mdi:volume-low
+    entity_category: config
+    restore_mode: DISABLED
+    optimistic: true
+    lambda: "return (id(unmasked_value_register_5) & 0x40) == 0x40;"
+    on_turn_on:
+      - lambda: |-
+          uint16_t checked_bit = 0x40;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          new_value &= ~checked_bit;                           // Clear and set
+          new_value += checked_bit;
+          if ((new_value) != id(unmasked_value_register_5)) {
+            // ESP_LOGD("unmasked_value_register_5", "Set option to on f_s_silent_mode 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
+            id(unmasked_value_register_5) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 0x5, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+    on_turn_off:
+      - lambda: |-
+          uint16_t checked_bit = 0x40;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          new_value &= ~checked_bit;                           // Clear and set
+          if ((new_value) != id(unmasked_value_register_5)) {
+            // ESP_LOGD("unmasked_value_register_5", "Set option to off f_s_silent_mode 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
+            id(unmasked_value_register_5) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 0x5, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+
+  # Reg 5 bit 8. V.E marks this bit read-only.
+  - platform: template
+    name: "Holiday Home"
+    id: "heatpump_holiday_home"
+    icon: mdi:eye
+    entity_category: config
+    restore_mode: DISABLED
+    optimistic: true
+    lambda: "return (id(unmasked_value_register_5) & 0x100) == 0x100;"
+    on_turn_on:
+      - lambda: |-
+          uint16_t checked_bit = 0x100;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          new_value &= ~checked_bit;                           // Clear and set
+          new_value += checked_bit;
+          if ((new_value) != id(unmasked_value_register_5)) {
+            // ESP_LOGD("unmasked_value_register_5", "Set option to on f_s_holiday_home 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
+            id(unmasked_value_register_5) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+    on_turn_off:
+      - lambda: |-
+          uint16_t checked_bit = 0x100;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          new_value &= ~checked_bit;                           // Clear and set
+          if ((new_value) != id(unmasked_value_register_5)) {
+            // ESP_LOGD("unmasked_value_register_5", "Set option to off f_s_holiday_home 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
+            id(unmasked_value_register_5) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+
+  - platform: template
+    name: "ECO Mode"
+    id: "heatpump_eco_mode"
+    icon: mdi:eye
+    entity_category: config
+    restore_mode: DISABLED
+    optimistic: true
+    lambda: "return (id(unmasked_value_register_5) & 0x400) == 0x400;"
+    on_turn_on:
+      - lambda: |-
+          uint16_t checked_bit = 0x400;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          new_value &= ~checked_bit;                           // Clear and set
+          new_value += checked_bit;
+          if ((new_value) != id(unmasked_value_register_5)) {
+            // ESP_LOGD("unmasked_value_register_5", "Set option to on f_s_eco_mode 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
+            id(unmasked_value_register_5) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+    on_turn_off:
+      - lambda: |-
+          uint16_t checked_bit = 0x400;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          new_value &= ~checked_bit;                           //Clear and set
+          if ((new_value) != id(unmasked_value_register_5)) {
+            // ESP_LOGD("unmasked_value_register_5", "Set option to off f_s_eco_mode 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
+            id(unmasked_value_register_5) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+
+  # Reg 5 bit 12: zone 1 climate curve on/off. No single-purpose register.
+  - platform: template
+    name: "Weather Compensation Zone 1"
+    id: "heatpump_weather_compensation_zone_1"
+    icon: mdi:eye
+    entity_category: config
+    restore_mode: DISABLED
+    optimistic: true
+    lambda: "return (id(unmasked_value_register_5) & 0x1000) == 0x1000;"
+    on_turn_on:
+      - lambda: |-
+          uint16_t checked_bit = 0x1000;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          new_value &= ~checked_bit;                           // Clear and set
+          new_value += checked_bit;
+          if ((new_value) != id(unmasked_value_register_5)) {
+            // ESP_LOGD("unmasked_value_register_5", "Set option to on weather_compensation_zone_1 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
+            id(unmasked_value_register_5) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+    on_turn_off:
+      - lambda: |-
+          uint16_t checked_bit = 0x1000;
+          if (!id(unmasked_value_register_5_valid)) {
+            ESP_LOGW("packed_register", "Refusing write: unmasked_value_register_5 not yet read from heatpump, would clobber other bits");
+            return;
+          }
+          uint16_t new_value = id(unmasked_value_register_5);  // The original unmasked value
+          new_value &= ~checked_bit;                           // Clear and set
+          if ((new_value) != id(unmasked_value_register_5)) {
+            // ESP_LOGD("unmasked_value_register_5", "Set option to off weather_compensation_zone_1 0x%x -> 0x%x", id(unmasked_value_register_5), new_value);
+            id(unmasked_value_register_5) = new_value;
+            esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 5, new_value);
+            heatpump->queue_command(set_payload_command);
+          }
+
+  # Reg 7.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Forced Water Tank Heating"
+    id: "heatpump_forced_water_tank_heating"
+    icon: mdi:fire-alert
+    address: 7
+    register_type: holding
+    entity_category: config
+    write_lambda: |-
+      uint16_t value = 0;
+
+      if (x == 1) {
+        // ESP_LOGI("main", "Set forced water tank heating ON");
+        value = 1;
+      } else {
+        // ESP_LOGI("main", "Set forced water tank heating OFF");
+        value = 2;
+      }
+
+      esphome::modbus_controller::ModbusCommandItem set_payload_command = esphome::modbus_controller::ModbusCommandItem::create_write_single_command(heatpump, 0x7, value);
+      heatpump->queue_command(set_payload_command);
+
+      return {};
+
+sensor:
+  # Reg 0 (power bits), read whole into the shadow global used by the reg 0 switches.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Register 0 switches"
+    id: "heatpump_register_0_switches"
+    internal: true
+    register_type: holding
+    address: 0
+    value_type: U_WORD
+    icon: mdi:eye
+    lambda: |-
+      // Update the global var unmasked_value_register_0
+      id(unmasked_value_register_0) = x;
+      id(unmasked_value_register_0_valid) = true;  // Shadow now holds a real value read from the heatpump
+      return x;
+
+  # Reg 5 (function settings), read whole into the shadow global used by the reg 5 switches/selects.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Register 5 switches"
+    id: "heatpump_register_5_switches"
+    internal: true
+    register_type: holding
+    address: 5
+    value_type: U_WORD
+    icon: mdi:eye
+    lambda: |-
+      // Update the global var unmasked_value_register_5
+      id(unmasked_value_register_5) = x;
+      id(unmasked_value_register_5_valid) = true;  // Shadow now holds a real value read from the heatpump
+      return x;
+
+  # Reg 10 bit 1 SG, bit 2 EVU (read-only here).
+  - id: "heatpump_special_function_settings"
+    platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Special Function Settings (SG-EVU)"
+    icon: mdi:transmission-tower
+    register_type: holding
+    address: 10
+    value_type: U_WORD
+
+  # Single-purpose control registers 11/15/16/18 (readbacks).
+  # V.E notes under reg 21: reg 0 = regs 14-17, reg 2 = regs 11/12, reg 6 = regs 18/19,
+  # "recommended to use [these] for control". Verified on this unit 2026-10-25.
+  # Each read also arms that register's write guard (regNN_valid).
+  # force_new_range: a Modbus exception can only fail its own read.
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Set Water Temperature T1S Zone 1 Readback (reg 11)"
+    id: "heatpump_reg11_t1s_zone_1"
+    icon: mdi:eye-check
+    register_type: holding
+    address: 11
+    value_type: U_WORD
+    unit_of_measurement: "°C"
+    device_class: temperature
+    accuracy_decimals: 0
+    force_new_range: true
+    entity_category: diagnostic
+    lambda: |-
+      id(reg11_value) = x;
+      id(reg11_valid) = true;  // real read: writes to reg 11 are allowed from now on
+      return x;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Power DHW T5S Readback (reg 15)"
+    id: "heatpump_reg15_power_dhw"
+    icon: mdi:eye-check
+    register_type: holding
+    address: 15
+    value_type: U_WORD
+    accuracy_decimals: 0
+    force_new_range: true
+    entity_category: diagnostic
+    lambda: |-
+      id(reg15_value) = x;
+      id(reg15_valid) = true;  // real read: writes to reg 15 are allowed from now on
+      return x;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Water Flow Temperature Control Zone 1 Readback (reg 16)"
+    id: "heatpump_reg16_power_zone_1"
+    icon: mdi:eye-check
+    register_type: holding
+    address: 16
+    value_type: U_WORD
+    accuracy_decimals: 0
+    force_new_range: true
+    entity_category: diagnostic
+    lambda: |-
+      id(reg16_value) = x;
+      id(reg16_valid) = true;  // real read: writes to reg 16 are allowed from now on
+      return x;
+
+  - platform: modbus_controller
+    modbus_controller_id: "heatpump"
+    name: "Weather Compensation Curve Zone 1 Readback (reg 18)"
+    id: "heatpump_reg18_curve_selection_zone_1"
+    icon: mdi:eye-check
+    register_type: holding
+    address: 18
+    value_type: U_WORD
+    accuracy_decimals: 0
+    force_new_range: true
+    entity_category: diagnostic
+    lambda: |-
+      id(reg18_value) = x;
+      id(reg18_valid) = true;  // real read: writes to reg 18 are allowed from now on
+      return x;
+
+binary_sensor:
+  - id: "heatpump_function_setting_refrigerant_leakage_detection"
+    platform: template
+    name: "Function Setting Refrigerant Leakage Detection"
+    icon: mdi:eye
+    lambda: "return (id(unmasked_value_register_5) & 0x01) == 0x01; // Return status bit0"
+
+  - platform: template
+    name: "Holiday Away"
+    id: "heatpump_holiday_away"
+    icon: mdi:eye
+    lambda: "return (id(unmasked_value_register_5) & 0x20) == 0x20; // Return status bit5"
+
+  - id: "heatpump_function_setting_c2_fault_restore"
+    platform: template
+    name: "Function Setting C2 Fault Restore"
+    icon: mdi:eye
+    lambda: "return (id(unmasked_value_register_5) & 0x4000) == 0x4000; // Return status bit14"

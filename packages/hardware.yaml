@@ -1,0 +1,88 @@
+# Board (LilyGO T-CAN485), network, Modbus bus and device housekeeping.
+
+esphome:
+  name: "heatpump"
+  comment: "Heatpump Controller"
+  friendly_name: "Heatpump Controller"
+  project:
+    name: "heatpump.Heatpump Controller"
+    version: 10.1.0
+  # List form, so other packages can add their own on_boot hooks next to this one.
+  on_boot:
+    - priority: 600
+      then:
+        - output.turn_on: tcan485_boost_enable
+        - output.turn_on: tcan485_rs485_enable
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: INFO
+  baud_rate: 0  # the UART is used for Modbus
+
+api:
+  encryption:
+    key: !secret heatpump_api_encryption_key
+
+ota:
+  platform: esphome
+  password: !secret heatpump_ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  power_save_mode: none
+  ap:
+    ssid: "heatpump-setup"
+    password: !secret heatpump_fallback_ap_password
+
+captive_portal:
+
+output:
+  - platform: gpio
+    pin: GPIO16
+    id: tcan485_boost_enable   # ME2107A boost supply – powers RS485/CAN chip
+  - platform: gpio
+    pin: GPIO19
+    id: tcan485_rs485_enable   # MAX13487E /SHDN – HIGH = transceiver active
+
+uart:
+  id: mod_bus
+  tx_pin: 22
+  rx_pin: 21
+  baud_rate: 9600
+  stop_bits: 1
+
+modbus:
+  flow_control_pin: 17
+  id: heatpump_modbus
+
+# The heat pump is Modbus slave 1. Every register is polled every 10 s.
+modbus_controller:
+  - id: "heatpump"
+    address: 1
+    modbus_id: heatpump_modbus
+    setup_priority: -10
+    update_interval: 10s
+
+switch:
+  - platform: factory_reset
+    name: Restart with Factory Default Settings
+    id: "heatpump_restart_with_factory_default_settings"
+    icon: mdi:restart-alert
+
+sensor:
+  - platform: uptime
+    name: Uptime
+    id: "heatpump_uptime"
+    icon: mdi:timelapse
+
+text_sensor:
+  - platform: version
+    name: "ESPHome Version"
+    id: "heatpump_esphome_version"
+    icon: mdi:information
+    hide_timestamp: true
