@@ -12,6 +12,11 @@ All registers are Modbus **holding** registers on slave 1, numbered in decimal a
 | `status.yaml` | 101, 124–131, 187–190, 198–200, 612–613 |
 | `installer-settings.yaml` | 201–279 |
 
+ESPHome merges consecutive addresses into one FC03 read. If the heat pump rejects any address in that read (exception 2, illegal data address), every entity in it stays empty. `force_new_range: true` on an entity starts a new read at its address:
+
+- **Reg 200** starts the read-only block 200–208. A read that crosses 199/200 is rejected, so 198–199 and 200–208 are read separately. Each of 198–208 reads fine on its own.
+- **Regs 11, 15, 16, 18** (the single-purpose *Readback* sensors) are each read on their own, so an error on one cannot blank its neighbours.
+
 ## What can be written, and how
 
 There are four write styles:
